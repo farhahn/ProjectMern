@@ -1,57 +1,247 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import {
+  fetchIncomeHeads,
+  addIncomeHead,
+  updateIncomeHead,
+  deleteIncomeHead,
+  clearError,
+} from '../../../redux/IncomeRelated/IncomeActions';
 
-const IncomeHeadPage = () => {
-  const [incomeHeads, setIncomeHeads] = useState([
-    { id: 1, name: 'Donation', description: 'Charity donations' },
-    { id: 2, name: 'Rent', description: 'Property rental income' },
-    { id: 3, name: 'Miscellaneous', description: 'Other income sources' },
-    { id: 4, name: 'Book Sale', description: 'Book selling income' },
-    { id: 5, name: 'Uniform Sale', description: 'Uniform sales income' },
-  ]);
+interface IncomeHead {
+  _id: string;
+  name: string;
+  description: string;
+}
+
+interface RootState {
+  income: {
+    incomeHeads: IncomeHead[];
+    loading: boolean;
+    error: string | null;
+  };
+  user: {
+    currentUser: { _id: string } | null;
+  };
+}
+
+const IncomeHeadPage: React.FC = () => {
+  const dispatch = useDispatch();
+  const { currentUser } = useSelector((state: RootState) => state.user || {});
+  const { incomeHeads, loading, error } = useSelector((state: RootState) => state.income || {});
+  const adminID = currentUser?._id;
 
   const [searchTerm, setSearchTerm] = useState('');
   const [newHead, setNewHead] = useState('');
   const [newDescription, setNewDescription] = useState('');
-  const [editingId, setEditingId] = useState(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (adminID) {
+      dispatch(fetchIncomeHeads(adminID));
+    } else {
+      toast.error('Please log in to view income heads', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+    }
+  }, [adminID, dispatch]);
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error, {
+        position: 'top-right',
+        autoClose: 3000,
+        onClose: () => dispatch(clearError()),
+      });
+    }
+  }, [error, dispatch]);
 
   const filteredHeads = incomeHeads.filter(head =>
     head.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     head.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newHead || !newDescription) return;
-
-    if (editingId) {
-      setIncomeHeads(incomeHeads.map(head =>
-        head.id === editingId ? { ...head, name: newHead, description: newDescription } : head
-      ));
-      setEditingId(null);
-    } else {
-      setIncomeHeads([...incomeHeads, {
-        id: incomeHeads.length + 1,
-        name: newHead,
-        description: newDescription
-      }]);
+    if (!newHead.trim() || !newDescription.trim()) {
+      toast.error('Income head and description are required', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+      return;
     }
 
-    setNewHead('');
-    setNewDescription('');
+    const headData = { name: newHead, description: newDescription };
+
+    try {
+      if (editingId) {
+        await dispatch(updateIncomeHead({ id: editingId, headData, adminID })).unwrap();
+        toast.warn('Income head updated successfully', {
+          position: 'top-right',
+          autoClose: 3000,
+        });
+      } else {
+        await dispatch(addIncomeHead({ headData, adminID })).unwrap();
+        toast.success('Income head added successfully', {
+          position: 'top-right',
+          autoClose: 3000,
+        });
+      }
+      setNewHead('');
+      setNewDescription('');
+      setEditingId(null);
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to save income head', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+    }
   };
 
-  const handleDelete = (id) => {
-    setIncomeHeads(incomeHeads.filter(head => head.id !== id));
+  const handleDelete = async (id: string) => {
+    try {
+      await dispatch(deleteIncomeHead({ id, adminID })).unwrap();
+      toast.error('Income head deleted successfully', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to delete income head', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+    }
   };
 
-  const handleEdit = (head) => {
+  const handleEdit = (head: IncomeHead) => {
     setNewHead(head.name);
     setNewDescription(head.description);
-    setEditingId(head.id);
+    setEditingId(head._id);
+  };
+
+  const styles = {
+    container: {
+      fontFamily: 'Arial, sans-serif',
+      maxWidth: '800px',
+      margin: '20px auto',
+      padding: '20px',
+      backgroundColor: '#e8c897',
+      borderRadius: '8px',
+      boxShadow: '0px 4px 10px rgba(0, 0, 0, 0.1)',
+    },
+    form: {
+      backgroundColor: '#fff',
+      padding: '20px',
+      borderRadius: '8px',
+      marginBottom: '20px',
+      boxShadow: '0 0 5px rgba(0,0,0,0.1)',
+    },
+    formGroup: {
+      marginBottom: '15px',
+    },
+    label: {
+      display: 'block',
+      marginBottom: '5px',
+      fontWeight: 'bold',
+      color: '#333',
+    },
+    input: {
+      width: '100%',
+      padding: '8px',
+      borderRadius: '4px',
+      border: '1px solid #ddd',
+      marginBottom: '10px',
+      fontSize: '14px',
+    },
+    button: {
+      backgroundColor: editingId ? '#ffc107' : '#28a745',
+      color: editingId ? '#212529' : 'white',
+      padding: '10px 20px',
+      border: 'none',
+      borderRadius: '4px',
+      cursor: 'pointer',
+      fontSize: '14px',
+    },
+    searchContainer: {
+      marginBottom: '20px',
+    },
+    searchInput: {
+      width: '100%',
+      padding: '8px',
+      borderRadius: '4px',
+      border: '1px solid #ddd',
+      fontSize: '14px',
+    },
+    table: {
+      background: '#fff',
+      borderRadius: '5px',
+      boxShadow: '0 0 5px rgba(0,0,0,0.1)',
+      padding: '10px',
+    },
+    tableHeader: {
+      display: 'flex',
+      backgroundColor: '#f8f9fa',
+      padding: '10px',
+      fontWeight: 'bold',
+      borderBottom: '1px solid #ddd',
+    },
+    tableRow: {
+      display: 'flex',
+      padding: '10px',
+      borderBottom: '1px solid #ddd',
+      alignItems: 'center',
+    },
+    headerCell: {
+      flex: 1,
+      padding: '0 10px',
+    },
+    cell: {
+      flex: 1,
+      padding: '0 10px',
+    },
+    actionButton: {
+      backgroundColor: '#2196F3',
+      color: 'white',
+      padding: '5px 10px',
+      border: 'none',
+      borderRadius: '4px',
+      cursor: 'pointer',
+      marginRight: '5px',
+      fontSize: '14px',
+    },
+    deleteButton: {
+      backgroundColor: '#dc3545',
+    },
+    recordCount: {
+      marginTop: '10px',
+      color: '#666',
+      textAlign: 'right',
+      fontSize: '14px',
+    },
+    loading: {
+      textAlign: 'center',
+      color: '#333',
+      fontSize: '16px',
+      margin: '20px 0',
+    },
   };
 
   return (
     <div style={styles.container}>
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+      />
       <form onSubmit={handleSubmit} style={styles.form}>
         <div style={styles.formGroup}>
           <label style={styles.label}>Income Head *</label>
@@ -60,34 +250,37 @@ const IncomeHeadPage = () => {
             value={newHead}
             onChange={(e) => setNewHead(e.target.value)}
             style={styles.input}
-            placeholder="Chef des revenus"
+            placeholder="Income Head"
+            required
           />
         </div>
         <div style={styles.formGroup}>
-          <label style={styles.label}>Description</label>
+          <label style={styles.label}>Description *</label>
           <input
             type="text"
             value={newDescription}
             onChange={(e) => setNewDescription(e.target.value)}
             style={styles.input}
             placeholder="Description"
+            required
           />
         </div>
         <button type="submit" style={styles.button}>
-          {editingId ? 'Update' : 'Search'}
+          {editingId ? 'Update Income Head' : 'Add Income Head'}
         </button>
       </form>
 
       <div style={styles.searchContainer}>
         <input
           type="text"
-          placeholder="Search..."
+          placeholder="Search by name or description..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           style={styles.searchInput}
         />
       </div>
 
+      {loading && <div style={styles.loading}>Loading...</div>}
       <div style={styles.table}>
         <div style={styles.tableHeader}>
           <div style={styles.headerCell}>Income Head</div>
@@ -95,14 +288,14 @@ const IncomeHeadPage = () => {
           <div style={styles.headerCell}>Action</div>
         </div>
         {filteredHeads.map(head => (
-          <div key={head.id} style={styles.tableRow}>
+          <div key={head._id} style={styles.tableRow}>
             <div style={styles.cell}>{head.name}</div>
             <div style={styles.cell}>{head.description}</div>
             <div style={styles.cell}>
               <button onClick={() => handleEdit(head)} style={styles.actionButton}>
                 Edit
               </button>
-              <button onClick={() => handleDelete(head.id)} style={{ ...styles.actionButton, ...styles.deleteButton }}>
+              <button onClick={() => handleDelete(head._id)} style={{ ...styles.actionButton, ...styles.deleteButton }}>
                 Delete
               </button>
             </div>
@@ -113,98 +306,57 @@ const IncomeHeadPage = () => {
       <div style={styles.recordCount}>
         Records: 1 to {filteredHeads.length} of {filteredHeads.length}
       </div>
+      <style jsx>{`
+        .Toastify__toast--success {
+          background: linear-gradient(135deg, #28a745, #218838);
+          color: #fff;
+          font-family: Arial, sans-serif;
+          border-radius: 8px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+          font-size: 1rem;
+        }
+        .Toastify__toast--error {
+          background: linear-gradient(135deg, #dc3545, #c82333);
+          color: #fff;
+          font-family: Arial, sans-serif;
+          borderRadius: 8px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+          font-size: 1rem;
+        }
+        .Toastify__toast--warning {
+          background: linear-gradient(135deg, #ffc107, #e0a800);
+          color: #212529;
+          font-family: Arial, sans-serif;
+          border-radius: 8px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+          font-size: 1rem;
+        }
+        .Toastify__toast-body {
+          padding: 10px;
+        }
+        .Toastify__close-button {
+          color: #fff;
+          opacity: 0.8;
+          transition: opacity 0.2s ease;
+        }
+        .Toastify__close-button:hover {
+          opacity: 1;
+        }
+        .Toastify__progress-bar {
+          background: rgba(255, 255, 255, 0.3);
+        }
+        .Toastify__toast--warning .Toastify__close-button {
+          color: #212529;
+        }
+        .Toastify__toast--warning .Toastify__progress-bar {
+          background: rgba(0, 0, 0, 0.3);
+        }
+        .tableRow:hover {
+          background-color: #f1f1f1;
+        }
+      `}</style>
     </div>
   );
-};
-
-const styles = {
-  container: {
-    fontFamily: 'Arial, sans-serif',
-    maxWidth: '800px',
-    margin: '20px auto',
-    padding: '20px',
-  },
-  form: {
-    backgroundColor: '#f5f5f5',
-    padding: '20px',
-    borderRadius: '8px',
-    marginBottom: '20px',
-  },
-  formGroup: {
-    marginBottom: '15px',
-  },
-  label: {
-    display: 'block',
-    marginBottom: '5px',
-    fontWeight: 'bold',
-  },
-  input: {
-    width: '100%',
-    padding: '8px',
-    borderRadius: '4px',
-    border: '1px solid #ddd',
-    marginBottom: '10px',
-  },
-  button: {
-    backgroundColor: '#4CAF50',
-    color: 'white',
-    padding: '10px 20px',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-  },
-  searchContainer: {
-    marginBottom: '20px',
-  },
-  searchInput: {
-    width: '100%',
-    padding: '8px',
-    borderRadius: '4px',
-    border: '1px solid #ddd',
-  },
-  table: {
-    border: '1px solid #ddd',
-    borderRadius: '8px',
-    overflow: 'hidden',
-  },
-  tableHeader: {
-    display: 'flex',
-    backgroundColor: '#f5f5f5',
-    padding: '10px',
-    fontWeight: 'bold',
-    borderBottom: '1px solid #ddd',
-  },
-  tableRow: {
-    display: 'flex',
-    padding: '10px',
-    borderBottom: '1px solid #ddd',
-    alignItems: 'center',
-  },
-  headerCell: {
-    flex: 1,
-    padding: '0 10px',
-  },
-  cell: {
-    flex: 1,
-    padding: '0 10px',
-  },
-  actionButton: {
-    backgroundColor: '#2196F3',
-    color: 'white',
-    padding: '5px 10px',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    marginRight: '5px',
-  },
-  deleteButton: {
-    backgroundColor: '#f44336',
-  },
-  recordCount: {
-    marginTop: '10px',
-    color: '#666',
-    textAlign: 'right',
-  },
 };
 
 export default IncomeHeadPage;

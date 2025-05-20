@@ -8,6 +8,7 @@ import {
   addIncome,
   updateIncome,
   deleteIncome,
+  fetchIncomeHeads,
   clearError,
 } from '../../../redux/IncomeRelated/IncomeActions';
 
@@ -22,9 +23,16 @@ interface Income {
   description: string;
 }
 
+interface IncomeHead {
+  _id: string;
+  name: string;
+  description: string;
+}
+
 interface RootState {
   income: {
     incomes: Income[];
+    incomeHeads: IncomeHead[];
     loading: boolean;
     error: string | null;
   };
@@ -36,7 +44,7 @@ interface RootState {
 const AddIncome: React.FC = () => {
   const dispatch = useDispatch();
   const { currentUser } = useSelector((state: RootState) => state.user || {});
-  const { incomes, loading, error } = useSelector((state: RootState) => state.income || {});
+  const { incomes, incomeHeads, loading, error } = useSelector((state: RootState) => state.income || {});
   const adminID = currentUser?._id;
 
   const initialFormData = {
@@ -53,11 +61,11 @@ const AddIncome: React.FC = () => {
   const [editId, setEditId] = useState<string | null>(null);
 
   const inputRefs = useRef<(HTMLInputElement | HTMLSelectElement | null)[]>([]);
-  const incomeHeads = ['Rent', 'Miscellaneous', 'Donation', 'Book Sale', 'Uniform Sale'];
 
   useEffect(() => {
     if (adminID) {
       dispatch(fetchIncomes(adminID));
+      dispatch(fetchIncomeHeads(adminID));
     } else {
       toast.error('Please log in to view incomes', {
         position: 'top-right',
@@ -142,7 +150,6 @@ const AddIncome: React.FC = () => {
       setFormData(initialFormData);
       setEditId(null);
     } catch (error: any) {
-      // Error is already dispatched to Redux state, but show toast for user
       toast.error(error.message || 'Failed to save income', {
         position: 'top-right',
         autoClose: 3000,
@@ -257,7 +264,7 @@ const AddIncome: React.FC = () => {
 
   const renderFormFields = () => {
     const fields = [
-      { name: 'incomeHead', label: 'Income Head *', type: 'select', options: incomeHeads },
+      { name: 'incomeHead', label: 'Income Head *', type: 'select', options: incomeHeads.map(head => head.name) },
       { name: 'name', label: 'Name *', type: 'text' },
       { name: 'invoiceNumber', label: 'Invoice Number', type: 'text' },
       { name: 'date', label: 'Date *', type: 'date' },
@@ -352,7 +359,7 @@ const AddIncome: React.FC = () => {
           </tbody>
         </table>
       </div>
-      <style >{`
+      <style jsx>{`
         .Toastify__toast--success {
           background: linear-gradient(135deg, #28a745, #218838);
           color: #fff;
@@ -385,7 +392,7 @@ const AddIncome: React.FC = () => {
           opacity: 0.8;
           transition: opacity 0.2s ease;
         }
-        .Toastify__closeshot:hover {
+        .Toastify__close-button:hover {
           opacity: 1;
         }
         .Toastify__progress-bar {

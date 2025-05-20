@@ -1,69 +1,15 @@
-import React, { Component } from 'react';
-import { FaSearch, FaCheck, FaTimes, FaEdit, FaTrash, FaSave, FaUndo } from 'react-icons/fa';
+import React, { useEffect, useState } from 'react';
+import {
+  Box, Typography, TextField, Button, Card, CardContent, Grid, Snackbar, Alert, IconButton,
+} from '@mui/material';
+import { Edit as EditIcon, Delete as DeleteIcon, Check as CheckIcon, Close as CloseIcon, Save as SaveIcon, Undo as UndoIcon } from '@mui/icons-material';
+import { useDispatch, useSelector } from 'react-redux';
+import {
+  getAllExpenseHeads, createExpenseHead, updateExpenseHead, deleteExpenseHead, clearExpenseHeadError,
+} from '../../../redux/expenseRelated/expenseHeadHandle';
 import styled from 'styled-components';
 
-// Styled Components
-const Container = styled.div`
-  max-width: 800px;
-  margin: 2rem auto;
-  padding: 20px;
-  background: #f5f7fb;
-  border-radius: 10px;
-  box-shadow: 0 2px 15px rgba(0,0,0,0.1);
-`;
-
-const Section = styled.div`
-  background: white;
-  padding: 20px;
-  border-radius: 8px;
-  margin-bottom: 20px;
-`;
-
-const Form = styled.form`
-  display: grid;
-  grid-template-columns: 1fr 1fr auto;
-  gap: 15px;
-  margin-bottom: 20px;
-
-  input, button {
-    padding: 8px 12px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-  }
-
-  button {
-    background: #4CAF50;
-    color: white;
-    border: none;
-    cursor: pointer;
-    transition: background 0.3s ease;
-
-    &:hover {
-      background: #45a049;
-    }
-  }
-`;
-
-const SearchContainer = styled.div`
-  position: relative;
-  margin-bottom: 20px;
-
-  input {
-    width: 100%;
-    padding: 8px 12px 8px 35px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-  }
-
-  svg {
-    position: absolute;
-    left: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: #666;
-  }
-`;
-
+// Styled Components (adapted for Material-UI integration)
 const ListItem = styled.div`
   display: grid;
   grid-template-columns: ${props => props.editing ? '1fr 1fr auto auto' : '1fr 2fr auto auto'};
@@ -109,209 +55,260 @@ const ActionContainer = styled.div`
   gap: 5px;
 `;
 
-const Pagination = styled.div`
-  text-align: center;
-  color: #666;
-  margin-top: 15px;
-  font-size: 0.9em;
-`;
+const ExpenseHeadPage = () => {
+  const [newHead, setNewHead] = useState('');
+  const [newDescription, setNewDescription] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [editingId, setEditingId] = useState(null);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [snack, setSnack] = useState({ open: false, message: '', severity: 'success' });
 
-class ExpenseHeadPage extends Component {
-  constructor(props) {
-    super(props);
-    this.state = {
-      expenseHeads: [
-        { id: 1, name: 'Stationery Purchase', description: 'Office stationery items', active: true },
-        { id: 2, name: 'Electricity Bill', description: 'Monthly electricity charges', active: true },
-        { id: 3, name: 'Telephone Bill', description: 'Mobile and landline bills', active: false },
-        { id: 4, name: 'Miscellaneous', description: 'Other expenses', active: true },
-        { id: 5, name: 'Flower', description: 'Floral decorations', active: false },
-      ],
-      searchQuery: '',
-      newHead: '',
-      newDescription: '',
-      editingId: null,
-      editName: '',
-      editDescription: ''
-    };
-  }
+  const dispatch = useDispatch();
+  const expenseHeadState = useSelector((state) => state.expenseHead || { expenseHeadsList: [], loading: false, error: null });
+  const userState = useSelector((state) => state.user || {});
+  const { expenseHeadsList, loading, error } = expenseHeadState;
+  const adminID = userState.currentUser?._id;
 
-  handleSubmit = (e) => {
+  useEffect(() => {
+    if (adminID) {
+      dispatch(getAllExpenseHeads(adminID));
+    } else {
+      setSnack({ open: true, message: 'Please log in to view expense heads', severity: 'error' });
+    }
+  }, [dispatch, adminID]);
+
+  useEffect(() => {
+    if (error) {
+      setSnack({ open: true, message: error, severity: 'error' });
+      dispatch(clearExpenseHeadError());
+    }
+  }, [error, dispatch]);
+
+  const handleSubmit = (e) => {
     e.preventDefault();
-    const { newHead, newDescription, expenseHeads } = this.state;
-    
-    if (!newHead.trim() || !newDescription.trim()) return;
-    
-    this.setState({
-      expenseHeads: [...expenseHeads, {
-        id: Date.now(),
-        name: newHead.trim(),
-        description: newDescription.trim(),
-        active: true
-      }],
-      newHead: '',
-      newDescription: ''
-    });
+    if (!adminID) {
+      setSnack({ open: true, message: 'Please log in to add expense heads', severity: 'error' });
+      return;
+    }
+    if (!newHead.trim() || !newDescription.trim()) {
+      setSnack({ open: true, message: 'All required fields must be filled', severity: 'warning' });
+      return;
+    }
+    dispatch(createExpenseHead({ name: newHead, description: newDescription }, adminID))
+      .then(() => {
+        setNewHead('');
+        setNewDescription('');
+        setSnack({ open: true, message: 'Expense head added successfully', severity: 'success' });
+      })
+      .catch(() => {
+        setSnack({ open: true, message: 'Failed to add expense head', severity: 'error' });
+      });
   };
 
-  toggleStatus = (id) => {
-    this.setState(prevState => ({
-      expenseHeads: prevState.expenseHeads.map(head => 
-        head.id === id ? { ...head, active: !head.active } : head
-      )
-    }));
+  const toggleStatus = (id, active) => {
+    dispatch(updateExpenseHead({ id, expenseHead: { active: !active }, adminID }))
+      .then(() => {
+        setSnack({ open: true, message: 'Status updated successfully', severity: 'success' });
+      })
+      .catch(() => {
+        setSnack({ open: true, message: 'Failed to update status', severity: 'error' });
+      });
   };
 
-  deleteHead = (id) => {
-    this.setState(prevState => ({
-      expenseHeads: prevState.expenseHeads.filter(head => head.id !== id)
-    }));
+  const deleteHead = (id) => {
+    if (!adminID) {
+      setSnack({ open: true, message: 'Please log in to delete expense heads', severity: 'error' });
+      return;
+    }
+    dispatch(deleteExpenseHead(id, adminID))
+      .then(() => {
+        setSnack({ open: true, message: 'Expense head deleted', severity: 'info' });
+      })
+      .catch(() => {
+        setSnack({ open: true, message: 'Failed to delete expense head', severity: 'error' });
+      });
   };
 
-  startEditing = (head) => {
-    this.setState({
-      editingId: head.id,
-      editName: head.name,
-      editDescription: head.description
-    });
+  const startEditing = (head) => {
+    setEditingId(head._id);
+    setEditName(head.name);
+    setEditDescription(head.description);
   };
 
-  cancelEditing = () => {
-    this.setState({
-      editingId: null,
-      editName: '',
-      editDescription: ''
-    });
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditName('');
+    setEditDescription('');
   };
 
-  saveEdit = () => {
-    this.setState(prevState => ({
-      expenseHeads: prevState.expenseHeads.map(head => 
-        head.id === prevState.editingId ? {
-          ...head,
-          name: prevState.editName.trim(),
-          description: prevState.editDescription.trim()
-        } : head
-      ),
-      editingId: null,
-      editName: '',
-      editDescription: ''
-    }));
+  const saveEdit = () => {
+    if (!editName.trim() || !editDescription.trim()) {
+      setSnack({ open: true, message: 'All required fields must be filled', severity: 'warning' });
+      return;
+    }
+    dispatch(updateExpenseHead({ id: editingId, expenseHead: { name: editName, description: editDescription }, adminID }))
+      .then(() => {
+        setEditingId(null);
+        setEditName('');
+        setEditDescription('');
+        setSnack({ open: true, message: 'Expense head updated successfully', severity: 'success' });
+      })
+      .catch(() => {
+        setSnack({ open: true, message: 'Failed to update expense head', severity: 'error' });
+      });
   };
 
-  get filteredHeads() {
-    const { expenseHeads, searchQuery } = this.state;
-    const query = searchQuery.toLowerCase();
-    
-    return expenseHeads.filter(head =>
-      head.name.toLowerCase().includes(query) ||
-      head.description.toLowerCase().includes(query)
-    );
-  }
+  const filteredHeads = expenseHeadsList.filter((head) =>
+    head.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    head.description.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-  render() {
-    const { newHead, newDescription, searchQuery, editingId, editName, editDescription } = this.state;
+  const handleCloseSnack = () => setSnack({ ...snack, open: false });
 
-    return (
-      <Container>
-        <Section>
-          <h2>Add Expense Head</h2>
-          <Form onSubmit={this.handleSubmit}>
-            <input
-              type="text"
-              placeholder="Expense Head"
-              value={newHead}
-              onChange={(e) => this.setState({ newHead: e.target.value })}
-              required
-            />
-            <input
-              type="text"
-              placeholder="Description"
-              value={newDescription}
-              onChange={(e) => this.setState({ newDescription: e.target.value })}
-              required
-            />
-            <button type="submit">Save</button>
-          </Form>
-        </Section>
+  return (
+    <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: '#f4f6f8', minHeight: '100vh' }}>
+      <Typography
+        variant="h4"
+        sx={{
+          textAlign: 'center',
+          fontWeight: 700,
+          color: '#1a2526',
+          mb: 4,
+          fontSize: { xs: '1.5rem', md: '2.125rem' },
+        }}
+      >
+        Expense Head Management
+      </Typography>
 
-        <Section>
-          <h2>Expense Head List</h2>
-          <SearchContainer>
-            <FaSearch />
-            <input
-              type="search"
-              placeholder="Search..."
-              value={searchQuery}
-              onChange={(e) => this.setState({ searchQuery: e.target.value })}
-            />
-          </SearchContainer>
+      <Grid container spacing={3}>
+        <Grid item xs={12}>
+          <Card sx={{ p: 2, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+            <CardContent>
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, color: '#1a2526' }}>
+                Add Expense Head
+              </Typography>
+              <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '15px', marginBottom: '20px' }}>
+                <TextField
+                  label="Expense Head"
+                  value={newHead}
+                  onChange={(e) => setNewHead(e.target.value)}
+                  required
+                  variant="outlined"
+                  size="small"
+                />
+                <TextField
+                  label="Description"
+                  value={newDescription}
+                  onChange={(e) => setNewDescription(e.target.value)}
+                  required
+                  variant="outlined"
+                  size="small"
+                />
+                <Button
+                  type="submit"
+                  variant="contained"
+                  color="success"
+                  sx={{ borderRadius: '20px', textTransform: 'none' }}
+                >
+                  Save
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </Grid>
 
-          {this.filteredHeads.map(head => (
-            <ListItem key={head.id} editing={editingId === head.id}>
-              {editingId === head.id ? (
-                <>
-                  <input
-                    value={editName}
-                    onChange={(e) => this.setState({ editName: e.target.value })}
-                  />
-                  <input
-                    value={editDescription}
-                    onChange={(e) => this.setState({ editDescription: e.target.value })}
-                  />
-                </>
+        <Grid item xs={12}>
+          <Card sx={{ p: 2, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+            <CardContent>
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, color: '#1a2526' }}>
+                Expense Head List
+              </Typography>
+              <TextField
+                fullWidth
+                label="Search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                variant="outlined"
+                size="small"
+                sx={{ mb: 2 }}
+              />
+              {loading ? (
+                <Typography textAlign="center">Loading...</Typography>
+              ) : filteredHeads.length === 0 ? (
+                <Typography textAlign="center">No expense heads found</Typography>
               ) : (
-                <>
-                  <div>{head.name}</div>
-                  <div>{head.description}</div>
-                </>
+                filteredHeads.map((head) => (
+                  <ListItem key={head._id} editing={editingId === head._id}>
+                    {editingId === head._id ? (
+                      <>
+                        <TextField
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          variant="outlined"
+                          size="small"
+                        />
+                        <TextField
+                          value={editDescription}
+                          onChange={(e) => setEditDescription(e.target.value)}
+                          variant="outlined"
+                          size="small"
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <div>{head.name}</div>
+                        <div>{head.description}</div>
+                      </>
+                    )}
+                    <StatusIndicator active={head.active} onClick={() => toggleStatus(head._id, head.active)}>
+                      {head.active ? <CheckIcon /> : <CloseIcon />}
+                      {head.active ? 'Active' : 'Inactive'}
+                    </StatusIndicator>
+                    <ActionContainer>
+                      {editingId === head._id ? (
+                        <>
+                          <IconButton onClick={saveEdit} sx={{ color: '#4CAF50' }}>
+                            <SaveIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton onClick={cancelEditing} sx={{ color: '#f44336' }}>
+                            <UndoIcon fontSize="small" />
+                          </IconButton>
+                        </>
+                      ) : (
+                        <>
+                          <IconButton onClick={() => startEditing(head)} sx={{ color: '#1976d2' }}>
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton onClick={() => deleteHead(head._id)} sx={{ color: '#d32f2f' }}>
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </>
+                      )}
+                    </ActionContainer>
+                  </ListItem>
+                ))
               )}
-              
-              <StatusIndicator 
-                active={head.active} 
-                onClick={() => this.toggleStatus(head.id)}
-              >
-                {head.active ? <FaCheck /> : <FaTimes />}
-                {head.active ? 'Active' : 'Inactive'}
-              </StatusIndicator>
+              <Typography sx={{ mt: 2, color: '#1a2526', textAlign: 'center' }}>
+                Showing {filteredHeads.length} of {expenseHeadsList.length} records
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
 
-              <ActionContainer>
-                {editingId === head.id ? (
-                  <>
-                    <FaSave 
-                      onClick={this.saveEdit}
-                      title="Save"
-                      style={{ color: '#4CAF50' }}
-                    />
-                    <FaUndo 
-                      onClick={this.cancelEditing}
-                      title="Cancel"
-                      style={{ color: '#f44336' }}
-                    />
-                  </>
-                ) : (
-                  <>
-                    <FaEdit 
-                      onClick={() => this.startEditing(head)}
-                      title="Edit"
-                    />
-                    <FaTrash 
-                      onClick={() => this.deleteHead(head.id)} 
-                      title="Delete"
-                    />
-                  </>
-                )}
-              </ActionContainer>
-            </ListItem>
-          ))}
-
-          <Pagination>
-            Showing {this.filteredHeads.length} of {this.state.expenseHeads.length} records
-          </Pagination>
-        </Section>
-      </Container>
-    );
-  }
-}
+      <Snackbar
+        open={snack.open}
+        autoHideDuration={3000}
+        onClose={handleCloseSnack}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={handleCloseSnack} severity={snack.severity} sx={{ width: '100%' }}>
+          {snack.message}
+        </Alert>
+      </Snackbar>
+    </Box>
+  );
+};
 
 export default ExpenseHeadPage;

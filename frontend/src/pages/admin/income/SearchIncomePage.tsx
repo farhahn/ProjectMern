@@ -1,28 +1,61 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import { searchIncomes, clearError } from '../../../redux/IncomeRelated/IncomeActions';
 
-const SearchIncomePage = () => {
+interface Income {
+  _id: string;
+  name: string;
+  invoiceNumber: string;
+  incomeHead: string;
+  date: string;
+  amount: number;
+}
+
+interface RootState {
+  income: {
+    incomes: Income[];
+    loading: boolean;
+    error: string | null;
+  };
+  user: {
+    currentUser: { _id: string } | null;
+  };
+}
+
+const SearchIncomePage: React.FC = () => {
+  const dispatch = useDispatch();
+  const { currentUser } = useSelector((state: RootState) => state.user || {});
+  const { incomes, loading, error } = useSelector((state: RootState) => state.income || {});
+  const adminID = currentUser?._id;
+
   const [searchType, setSearchType] = useState('Last 12 Months');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const [data] = useState([
-    {
-      Name: 'Online classes',
-      InvoiceNumber: '475',
-      IncomeHead: 'Miscellaneous',
-      Date: '06/15/2024',
-      Amount: 200.00,
-    },
-    {
-      Name: 'Extra curricular activities',
-      InvoiceNumber: '45352',
-      IncomeHead: 'Miscellaneous',
-      Date: '06/25/2024',
-      Amount: 200.00,
-    },
-  ]);
+  useEffect(() => {
+    if (adminID) {
+      dispatch(searchIncomes({ adminID, searchType, searchQuery }));
+    } else {
+      toast.error('Please log in to view incomes', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+    }
+  }, [adminID, searchType, searchQuery, dispatch]);
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error, {
+        position: 'top-right',
+        autoClose: 3000,
+        onClose: () => dispatch(clearError()),
+      });
+    }
+  }, [error, dispatch]);
 
   const filteredData = useMemo(() => {
-    let result = [...data];
+    let result = [...incomes];
     const currentDate = new Date();
 
     if (searchType.includes('Months')) {
@@ -31,26 +64,26 @@ const SearchIncomePage = () => {
       monthsAgo.setMonth(currentDate.getMonth() - monthsCount);
 
       result = result.filter(entry => {
-        const [month, day, year] = entry.Date.split('/').map(Number);
+        const [month, day, year] = entry.date.split('/').map(Number);
         const entryDate = new Date(year, month - 1, day);
         return entryDate >= monthsAgo;
       });
     } else if (searchType === 'Search') {
       const query = searchQuery.toLowerCase();
       result = result.filter(entry => 
-        entry.Name.toLowerCase().includes(query) ||
-        entry.InvoiceNumber.toLowerCase().includes(query)
+        entry.name.toLowerCase().includes(query) ||
+        entry.invoiceNumber.toLowerCase().includes(query)
       );
     } else if (searchType === 'Search By Income') {
       const query = searchQuery.toLowerCase();
       result = result.filter(entry => 
-        entry.IncomeHead.toLowerCase().includes(query) ||
-        entry.Amount.toString().includes(searchQuery)
+        entry.incomeHead.toLowerCase().includes(query) ||
+        entry.amount.toString().includes(searchQuery)
       );
     }
 
     return result;
-  }, [data, searchType, searchQuery]);
+  }, [incomes, searchType, searchQuery]);
 
   const styles = {
     container: {
@@ -58,6 +91,9 @@ const SearchIncomePage = () => {
       fontFamily: 'Arial, sans-serif',
       maxWidth: '1000px',
       margin: '0 auto',
+      backgroundColor: '#e8c897',
+      borderRadius: '8px',
+      boxShadow: '0px 4px 10px rgba(0, 0, 0, 0.1)',
     },
     searchSection: {
       display: 'flex',
@@ -70,19 +106,24 @@ const SearchIncomePage = () => {
       borderRadius: '6px',
       border: '1px solid #ccc',
       width: '250px',
+      fontSize: '14px',
     },
     searchInput: {
       padding: '10px',
       borderRadius: '6px',
       border: '1px solid #ccc',
       flexGrow: 1,
+      fontSize: '14px',
+    },
+    tableContainer: {
+      background: '#fff',
+      borderRadius: '5px',
+      boxShadow: '0 0 5px rgba(0,0,0,0.1)',
+      padding: '10px',
     },
     table: {
       width: '100%',
       borderCollapse: 'collapse',
-      boxShadow: '0 0 20px rgba(0, 0, 0, 0.1)',
-      borderRadius: '8px',
-      overflow: 'hidden',
     },
     thTd: {
       border: '1px solid #ddd',
@@ -91,6 +132,7 @@ const SearchIncomePage = () => {
     },
     th: {
       backgroundColor: '#f5f5f5',
+      fontWeight: 'bold',
     },
     detailsSection: {
       display: 'grid',
@@ -109,10 +151,27 @@ const SearchIncomePage = () => {
       color: '#333',
       fontSize: '18px',
     },
+    loading: {
+      textAlign: 'center',
+      color: '#333',
+      fontSize: '16px',
+      margin: '20px 0',
+    },
   };
 
   return (
     <div style={styles.container}>
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+      />
       <div style={styles.searchSection}>
         <select 
           style={styles.dropdown}
@@ -135,43 +194,73 @@ const SearchIncomePage = () => {
         />
       </div>
 
-      <table style={styles.table}>
-        <thead>
-          <tr>
-            <th style={{...styles.thTd, ...styles.th}}>Name</th>
-            <th style={{...styles.thTd, ...styles.th}}>Invoice Number</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filteredData.map((entry, index) => (
-            <tr key={index}>
-              <td style={styles.thTd}>{entry.Name}</td>
-              <td style={styles.thTd}>{entry.InvoiceNumber}</td>
+      {loading && <div style={styles.loading}>Loading...</div>}
+      <div style={styles.tableContainer}>
+        <table style={styles.table}>
+          <thead>
+            <tr>
+              <th style={{...styles.thTd, ...styles.th}}>Name</th>
+              <th style={{...styles.thTd, ...styles.th}}>Invoice Number</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {filteredData.map((entry) => (
+              <tr key={entry._id}>
+                <td style={styles.thTd}>{entry.name}</td>
+                <td style={styles.thTd}>{entry.invoiceNumber}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       <div style={styles.detailsSection}>
         <div style={styles.detailBox}>
           <h3 style={styles.heading}>Income Head</h3>
-          {filteredData.map((entry, index) => (
-            <div key={index}>{entry.IncomeHead}</div>
+          {filteredData.map((entry) => (
+            <div key={entry._id}>{entry.incomeHead}</div>
           ))}
         </div>
         <div style={styles.detailBox}>
           <h3 style={styles.heading}>Date</h3>
-          {filteredData.map((entry, index) => (
-            <div key={index}>{entry.Date}</div>
+          {filteredData.map((entry) => (
+            <div key={entry._id}>{entry.date}</div>
           ))}
         </div>
         <div style={styles.detailBox}>
           <h3 style={styles.heading}>Amount (₹)</h3>
-          {filteredData.map((entry, index) => (
-            <div key={index}>₹{entry.Amount.toFixed(2)}</div>
+          {filteredData.map((entry) => (
+            <div key={entry._id}>₹{entry.amount.toFixed(2)}</div>
           ))}
         </div>
       </div>
+      <style jsx>{`
+        .Toastify__toast--error {
+          background: linear-gradient(135deg, #dc3545, #c82333);
+          color: #fff;
+          font-family: Arial, sans-serif;
+          border-radius: 8px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+          font-size: 1rem;
+        }
+        .Toastify__toast-body {
+          padding: 10px;
+        }
+        .Toastify__close-button {
+          color: #fff;
+          opacity: 0.8;
+          transition: opacity 0.2s ease;
+        }
+        .Toastify__close-button:hover {
+          opacity: 1;
+        }
+        .Toastify__progress-bar {
+          background: rgba(255, 255, 255, 0.3);
+        }
+        tr:hover {
+          background-color: #f1f1f1;
+        }
+      `}</style>
     </div>
   );
 };

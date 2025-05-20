@@ -16,6 +16,8 @@ import phoneCallLogsReducer from "./FrontOffice/Enquiry/phoneSlice";
 import frontOfficeReducer from './FrontOffice/Enquiry/frontOfficeSlice.js';
 import visitorReducer from './FrontOffice/Enquiry/VisitorSlice.js';
 import incomeReducer from './IncomeRelated/IncomeSlice.js';
+import expenseReducer from "./expenseRelated/expenseSlice.js";
+import expenseHeadReducer from "./expenseRelated/expenseHeadSlice.js";
 
 // import { librariansReducer } from './librarianrelated/librarianSlice';
 
@@ -38,6 +40,8 @@ const store = configureStore({
         frontOffice: frontOfficeReducer,
          visitor: visitorReducer,
          income: incomeReducer,
+         expense: expenseReducer,
+         expenseHead: expenseHeadReducer,
         // librarians: librariansReducer, // ✅ Key should match useSelector()
     },
 });

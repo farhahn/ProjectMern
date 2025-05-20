@@ -4,6 +4,9 @@ const incomeSlice = createSlice({
   name: 'income',
   initialState: {
     incomes: [],
+    incomeHeads: [],
+    expenses: [],
+    expenseHeads: [],
     loading: false,
     error: null,
     status: 'idle',
@@ -16,6 +19,24 @@ const incomeSlice = createSlice({
     },
     getSuccess: (state, action) => {
       state.incomes = action.payload;
+      state.loading = false;
+      state.error = null;
+      state.status = 'success';
+    },
+    getHeadsSuccess: (state, action) => {
+      state.incomeHeads = action.payload;
+      state.loading = false;
+      state.error = null;
+      state.status = 'success';
+    },
+    getExpensesSuccess: (state, action) => {
+      state.expenses = action.payload;
+      state.loading = false;
+      state.error = null;
+      state.status = 'success';
+    },
+    getExpenseHeadsSuccess: (state, action) => {
+      state.expenseHeads = action.payload;
       state.loading = false;
       state.error = null;
       state.status = 'success';
@@ -35,5 +56,14 @@ const incomeSlice = createSlice({
   },
 });
 
-export const { getRequest, getSuccess, getError, stuffDone, clearError } = incomeSlice.actions;
+export const {
+  getRequest,
+  getSuccess,
+  getHeadsSuccess,
+  getExpensesSuccess,
+  getExpenseHeadsSuccess,
+  getError,
+  stuffDone,
+  clearError,
+} = incomeSlice.actions;
 export default incomeSlice.reducer;

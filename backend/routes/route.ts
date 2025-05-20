@@ -152,22 +152,51 @@ router.post('/visitor', addVisitor);
 router.put('/visitor/:id', updateVisitor);
 router.delete('/visitor/:id', deleteVisitor);
 
-const { getIncomes, addIncome, updateIncome, deleteIncome } = require('../controllers/incomeController');
+const { getIncomes, addIncome, updateIncome, deleteIncome, searchIncomes } = require('../controllers/incomeController');
 
 router.get('/incomes/:adminID', getIncomes);
+router.get('/incomes/search/:adminID', searchIncomes);
 router.post('/income', addIncome);
 router.put('/income/:id', updateIncome);
 router.delete('/income/:id', deleteIncome);
 
 
+const {
+  getIncomeHeads,
+  addIncomeHead,
+  updateIncomeHead,
+  deleteIncomeHead,
+} = require('../controllers/incomeHeadController');
+
+router.get('/income-heads/:adminID', getIncomeHeads);
+router.post('/income-head', addIncomeHead);
+router.put('/income-head/:id', updateIncomeHead);
+router.delete('/income-head/:id', deleteIncomeHead);
+
+const expenseController = require('../controllers/expenseController');
+
+console.log('Registering expense routes');
+router.get('/expenses/:adminID', expenseController.getExpenses);
+router.post('/expense', upload.single('attachedFile'), expenseController.addExpense);
+router.put('/expense/:id', upload.single('attachedFile'), expenseController.updateExpense);
+router.delete('/expense/:id', expenseController.deleteExpense);
+
+
+// const { getExpenseHeads, addExpenseHead } = require('../controllers/expenseHeadController');
+
+// router.get('/expense-heads/:adminID', getExpenseHeads);
+// router.post('/expense-head', addExpenseHead);
 
 
 
 
+const expenseHeadController = require('../controllers/expense-head-controller');
 
-
-
-
+console.log('Registering expense head routes');
+router.get('/expense-heads/:adminID', expenseHeadController.getExpenseHeads);
+router.post('/expense-head', expenseHeadController.addExpenseHead);
+router.put('/expense-head/:id', expenseHeadController.updateExpenseHead);
+router.delete('/expense-head/:id', expenseHeadController.deleteExpenseHead);
 
 
 
