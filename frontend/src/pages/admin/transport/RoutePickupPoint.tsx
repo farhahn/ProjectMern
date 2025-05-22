@@ -1,419 +1,424 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import {
+  Box, Typography, TextField, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  Paper, IconButton, Snackbar, Alert, Grid, Card, CardContent, InputAdornment, Dialog, DialogTitle,
+  DialogContent, DialogActions, Select, MenuItem, InputLabel, FormControl
+} from '@mui/material';
+import { Search as SearchIcon, Edit as EditIcon, Delete as DeleteIcon, Print as PrintIcon, Download as DownloadIcon } from '@mui/icons-material';
+import { useDispatch, useSelector } from 'react-redux';
+import { getAllRoutePickupPoints, createRoutePickupPoint, updateRoutePickupPoint, deleteRoutePickupPoint, clearRoutePickupPointError } from '../../../redux/TransportRelated/route-pickup-pointAction';
+import { getAllTransportRoutes } from '../../../redux/TransportRelated/routeHandle';
+import { getAllPickupPoints } from '../../../redux/TransportRelated/PickupPointAction';
+import { CSVLink } from 'react-csv';
 
 const RoutePickupPoint = () => {
-  const [routes, setRoutes] = useState([
-    {
-      route: 'Brooklyn Central',
-      pickups: [
-        { point: '1 Brooklyn North', fee: 50.00, distance: 20.0, time: '9:00 AM' },
-        { point: '2 Brooklyn South', fee: 60.00, distance: 15.0, time: '9:30 AM' },
-        { point: '3 Brooklyn West', fee: 50.00, distance: 25.0, time: '10:15 AM' },
-        { point: '4 Brooklyn East', fee: 50.00, distance: 10.0, time: '10:45 AM' },
-      ],
-    },
-    {
-      route: 'Brooklyn East',
-      pickups: [
-        { point: '1 Brooklyn North', fee: 50.00, distance: 20.0, time: '11:30 AM' },
-        { point: '2 Brooklyn Central', fee: 50.00, distance: 25.0, time: '12:30 PM' },
-        { point: '3 Brooklyn South', fee: 100.00, distance: 15.0, time: '2:30 PM' },
-        { point: '4 Ranital Chowk', fee: 100.00, distance: 20.0, time: '3:00 PM' },
-      ],
-    },
-  ]);
-
+  const [searchTerm, setSearchTerm] = useState('');
   const [showAddPopup, setShowAddPopup] = useState(false);
   const [showEditPopup, setShowEditPopup] = useState(false);
-  const [editData, setEditData] = useState({ routeIndex: null, pickupIndex: null, point: '', fee: 0, distance: 0, time: '' });
-  const [newPickup, setNewPickup] = useState({ point: '', fee: 0, distance: 0, time: '' });
-  const [showSuccess, setShowSuccess] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
-  const [deleteData, setDeleteData] = useState({ routeIndex: null, pickupIndex: null });
+  const [deleteId, setDeleteId] = useState(null);
+  const [newPickup, setNewPickup] = useState({ routeId: '', pointId: '', fee: '', distance: '', time: '' });
+  const [editPickup, setEditPickup] = useState({ id: '', routeId: '', pointId: '', fee: '', distance: '', time: '' });
+  const [snack, setSnack] = useState({ open: false, message: '', severity: 'success' });
+
+  const dispatch = useDispatch();
+  const routePickupPointState = useSelector((state) => state.routePickupPoint || { routePickupPointsList: [], loading: false, error: null });
+  const transportRouteState = useSelector((state) => state.transportRoute || { transportRoutesList: [], loading: false, error: null });
+  const pickupPointState = useSelector((state) => state.pickupPoint || { pickupPointsList: [], loading: false, error: null });
+  const userState = useSelector((state) => state.user || {});
+  const { routePickupPointsList, loading, error } = routePickupPointState;
+  const { transportRoutesList } = transportRouteState;
+  const { pickupPointsList } = pickupPointState;
+  const adminID = userState.currentUser?._id;
+
+  useEffect(() => {
+    if (adminID) {
+      dispatch(getAllRoutePickupPoints(adminID));
+      dispatch(getAllTransportRoutes(adminID));
+      dispatch(getAllPickupPoints(adminID));
+    } else {
+      setSnack({ open: true, message: 'Please log in to view route pickup points', severity: 'error' });
+    }
+  }, [dispatch, adminID]);
+
+  useEffect(() => {
+    if (error) {
+      setSnack({ open: true, message: error, severity: 'error' });
+      dispatch(clearRoutePickupPointError());
+    }
+  }, [error, dispatch]);
 
   const handleAdd = () => {
+    setNewPickup({ routeId: transportRoutesList[0]?._id || '', pointId: '', fee: '', distance: '', time: '' });
     setShowAddPopup(true);
   };
 
   const handleSaveAdd = () => {
-    if (newPickup.point && newPickup.fee && newPickup.distance && newPickup.time) {
-      const updatedRoutes = [...routes];
-      updatedRoutes[0].pickups.push({ ...newPickup, fee: parseFloat(newPickup.fee), distance: parseFloat(newPickup.distance) });
-      setRoutes(updatedRoutes);
-      setNewPickup({ point: '', fee: 0, distance: 0, time: '' });
-      setShowAddPopup(false);
-      setShowSuccess(true);
-      setTimeout(() => setShowSuccess(false), 3000);
+    if (!adminID) {
+      setSnack({ open: true, message: 'Please log in to add route pickup points', severity: 'error' });
+      return;
     }
+    if (!newPickup.routeId || !newPickup.pointId || !newPickup.fee || !newPickup.distance || !newPickup.time) {
+      setSnack({ open: true, message: 'All fields are required', severity: 'warning' });
+      return;
+    }
+    dispatch(createRoutePickupPoint(newPickup, adminID))
+      .then(() => {
+        setSnack({ open: true, message: 'Route pickup point added successfully', severity: 'success' });
+        setShowAddPopup(false);
+        setNewPickup({ routeId: '', pointId: '', fee: '', distance: '', time: '' });
+      })
+      .catch((err) => {
+        setSnack({ open: true, message: err.message || 'Failed to add route pickup point', severity: 'error' });
+      });
   };
 
-  const handleEdit = (routeIndex, pickupIndex) => {
-    const pickup = routes[routeIndex].pickups[pickupIndex];
-    setEditData({ routeIndex, pickupIndex, point: pickup.point, fee: pickup.fee, distance: pickup.distance, time: pickup.time });
+  const handleEdit = (pickup) => {
+    setEditPickup({
+      id: pickup._id,
+      routeId: transportRoutesList.find((route) => route.title === pickup.route)?._id || '',
+      pointId: pickupPointsList.find((point) => point.name === pickup.point)?._id || '',
+      fee: pickup.fee.toString(),
+      distance: pickup.distance.toString(),
+      time: pickup.time,
+    });
     setShowEditPopup(true);
   };
 
   const handleSaveEdit = () => {
-    if (editData.point && editData.fee && editData.distance && editData.time) {
-      const updatedRoutes = [...routes];
-      updatedRoutes[editData.routeIndex].pickups[editData.pickupIndex] = {
-        ...updatedRoutes[editData.routeIndex].pickups[editData.pickupIndex],
-        point: editData.point,
-        fee: parseFloat(editData.fee),
-        distance: parseFloat(editData.distance),
-        time: editData.time,
-      };
-      setRoutes(updatedRoutes);
-      setShowEditPopup(false);
-      setShowSuccess(true);
-      setTimeout(() => setShowSuccess(false), 3000);
+    if (!adminID) {
+      setSnack({ open: true, message: 'Please log in to update route pickup points', severity: 'error' });
+      return;
     }
+    if (!editPickup.routeId || !editPickup.pointId || !editPickup.fee || !editPickup.distance || !editPickup.time) {
+      setSnack({ open: true, message: 'All fields are required', severity: 'warning' });
+      return;
+    }
+    dispatch(updateRoutePickupPoint({ id: editPickup.id, routePickupPoint: editPickup, adminID }))
+      .then(() => {
+        setSnack({ open: true, message: 'Route pickup point updated successfully', severity: 'success' });
+        setShowEditPopup(false);
+        setEditPickup({ id: '', routeId: '', pointId: '', fee: '', distance: '', time: '' });
+      })
+      .catch((err) => {
+        setSnack({ open: true, message: err.message || 'Failed to update route pickup point', severity: 'error' });
+      });
   };
 
-  const handleDeleteConfirm = (routeIndex, pickupIndex) => {
-    setDeleteData({ routeIndex, pickupIndex });
+  const handleDeleteConfirm = (id) => {
+    setDeleteId(id);
     setShowDelete(true);
   };
 
   const handleDelete = () => {
-    if (deleteData.routeIndex !== null && deleteData.pickupIndex !== null) {
-      const updatedRoutes = [...routes];
-      updatedRoutes[deleteData.routeIndex].pickups.splice(deleteData.pickupIndex, 1);
-      setRoutes(updatedRoutes);
-      setShowDelete(false);
-      setDeleteData({ routeIndex: null, pickupIndex: null });
+    if (!adminID) {
+      setSnack({ open: true, message: 'Please log in to delete route pickup points', severity: 'error' });
+      return;
     }
+    dispatch(deleteRoutePickupPoint(deleteId, adminID))
+      .then(() => {
+        setSnack({ open: true, message: 'Route pickup point deleted successfully', severity: 'info' });
+        setShowDelete(false);
+        setDeleteId(null);
+      })
+      .catch((err) => {
+        setSnack({ open: true, message: err.message || 'Failed to delete route pickup point', severity: 'error' });
+      });
   };
 
   const handleCancelDelete = () => {
     setShowDelete(false);
-    setDeleteData({ routeIndex: null, pickupIndex: null });
+    setDeleteId(null);
   };
 
   const handleCancelPopup = () => {
     setShowAddPopup(false);
     setShowEditPopup(false);
-    setNewPickup({ point: '', fee: 0, distance: 0, time: '' });
-    setEditData({ routeIndex: null, pickupIndex: null, point: '', fee: 0, distance: 0, time: '' });
+    setNewPickup({ routeId: '', pointId: '', fee: '', distance: '', time: '' });
+    setEditPickup({ id: '', routeId: '', pointId: '', fee: '', distance: '', time: '' });
   };
 
+  const handleExport = () => {
+    setSnack({ open: true, message: 'Exporting route pickup points as CSV', severity: 'info' });
+  };
+
+  const handlePrint = () => {
+    window.print();
+    setSnack({ open: true, message: 'Printing route pickup points', severity: 'info' });
+  };
+
+  const filteredRoutes = routePickupPointsList.filter((route) =>
+    route.route.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    route.pickups.some((pickup) => pickup.point.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
+  const csvData = filteredRoutes.flatMap((route) =>
+    route.pickups.map((pickup) => ({
+      Route: route.route,
+      'Pickup Point': pickup.point,
+      'Monthly Fees ($)': pickup.fee,
+      'Distance (km)': pickup.distance,
+      'Pickup Time': pickup.time,
+    }))
+  );
+
   return (
-    <div style={styles.container}>
-      <h2 style={styles.title}>Route Pickup Point</h2>
-      <div style={styles.header}>
-        <input type="text" placeholder="Search..." style={styles.search} />
-        <button onClick={handleAdd} style={styles.addButton}>
-          Add
-        </button>
-      </div>
-      {routes.map((route, routeIndex) => (
-        <div key={routeIndex} style={styles.routeSection}>
-          <h3 style={styles.routeTitle}>{route.route}</h3>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>Pickup Point</th>
-                <th style={styles.th}>Monthly Fees ($)</th>
-                <th style={styles.th}>Distance (km)</th>
-                <th style={styles.th}>Pickup Time</th>
-                <th style={styles.th}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {route.pickups.map((pickup, pickupIndex) => (
-                <tr key={pickupIndex} style={styles.tr}>
-                  <td style={styles.td}>{pickup.point}</td>
-                  <td style={styles.td}>{pickup.fee.toFixed(2)}</td>
-                  <td style={styles.td}>{pickup.distance}</td>
-                  <td style={styles.td}>{pickup.time}</td>
-                  <td style={styles.td}>
-                    <button
-                      onClick={() => handleEdit(routeIndex, pickupIndex)}
-                      style={styles.actionButton}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDeleteConfirm(routeIndex, pickupIndex)}
-                      style={styles.actionButton}
-                    >
-                      Remove
-                    </button>
-                  </td>
-                </tr>
+    <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: '#f4f6f8', minHeight: '100vh' }}>
+      <Typography
+        variant="h4"
+        sx={{
+          textAlign: 'center',
+          fontWeight: 700,
+          color: '#1a2526',
+          mb: 4,
+          fontSize: { xs: '1.5rem', md: '2.125rem' },
+        }}
+      >
+        Route Pickup Point Management
+      </Typography>
+
+      <Grid container spacing={3}>
+        <Grid item xs={12}>
+          <Card sx={{ p: 2, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+            <CardContent>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6" sx={{ fontWeight: 600, color: '#1a2526' }}>
+                  Route Pickup Point List
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <CSVLink
+                    data={csvData}
+                    filename="route-pickup-points.csv"
+                    style={{ textDecoration: 'none' }}
+                    onClick={handleExport}
+                  >
+                    <IconButton sx={{ color: '#666' }} title="Export">
+                      <DownloadIcon />
+                    </IconButton>
+                  </CSVLink>
+                  <IconButton sx={{ color: '#666' }} onClick={handlePrint} title="Print">
+                    <PrintIcon />
+                  </IconButton>
+                  <Button
+                    variant="contained"
+                    color="success"
+                    onClick={handleAdd}
+                    sx={{ borderRadius: '20px', textTransform: 'none' }}
+                  >
+                    + Add
+                  </Button>
+                </Box>
+              </Box>
+              <TextField
+                fullWidth
+                label="Search routes or pickup points"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                variant="outlined"
+                size="small"
+                sx={{ mb: 2 }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+              {filteredRoutes.map((route, routeIndex) => (
+                <Box key={routeIndex} sx={{ mb: 4 }}>
+                  <Typography variant="h6" sx={{ color: '#1a2526', mb: 2, fontWeight: 600 }}>
+                    {route.route}
+                  </Typography>
+                  <TableContainer component={Paper} sx={{ boxShadow: 'none' }}>
+                    <Table>
+                      <TableHead>
+                        <TableRow sx={{ bgcolor: '#1a2526' }}>
+                          <TableCell sx={{ color: '#fff', fontWeight: 600, fontSize: { xs: '0.75rem', md: '0.875rem' }, p: { xs: 1, md: 2 } }}>
+                            Pickup Point
+                          </TableCell>
+                          <TableCell sx={{ color: '#fff', fontWeight: 600, fontSize: { xs: '0.75rem', md: '0.875rem' }, p: { xs: 1, md: 2 } }}>
+                            Monthly Fees ($)
+                          </TableCell>
+                          <TableCell sx={{ color: '#fff', fontWeight: 600, fontSize: { xs: '0.75rem', md: '0.875rem' }, p: { xs: 1, md: 2 } }}>
+                            Distance (km)
+                          </TableCell>
+                          <TableCell sx={{ color: '#fff', fontWeight: 600, fontSize: { xs: '0.75rem', md: '0.875rem' }, p: { xs: 1, md: 2 } }}>
+                            Pickup Time
+                          </TableCell>
+                          <TableCell sx={{ color: '#fff', fontWeight: 600, fontSize: { xs: '0.75rem', md: '0.875rem' }, p: { xs: 1, md: 2 } }}>
+                            Action
+                          </TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {loading ? (
+                          <TableRow>
+                            <TableCell colSpan={5} sx={{ textAlign: 'center' }}>
+                              Loading...
+                            </TableCell>
+                          </TableRow>
+                        ) : route.pickups.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={5} sx={{ textAlign: 'center', p: 4, color: '#666' }}>
+                              No pickup points found
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          route.pickups.map((pickup, pickupIndex) => (
+                            <TableRow
+                              key={pickup._id}
+                              sx={{
+                                bgcolor: pickupIndex % 2 ? '#fff' : '#f9f9f9',
+                                '&:hover': { bgcolor: '#e0f7fa' },
+                              }}
+                            >
+                              <TableCell sx={{ p: { xs: 1, md: 2 }, fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
+                                {pickup.point}
+                              </TableCell>
+                              <TableCell sx={{ p: { xs: 1, md: 2 }, fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
+                                {pickup.fee.toFixed(2)}
+                              </TableCell>
+                              <TableCell sx={{ p: { xs: 1, md: 2 }, fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
+                                {pickup.distance}
+                              </TableCell>
+                              <TableCell sx={{ p: { xs: 1, md: 2 }, fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
+                                {pickup.time}
+                              </TableCell>
+                              <TableCell sx={{ p: { xs: 1, md: 2 } }}>
+                                <IconButton
+                                  onClick={() => handleEdit(pickup)}
+                                  sx={{ color: '#1976d2', p: { xs: 0.5, md: 1 } }}
+                                  title="Edit"
+                                >
+                                  <EditIcon fontSize="small" />
+                                </IconButton>
+                                <IconButton
+                                  onClick={() => handleDeleteConfirm(pickup._id)}
+                                  sx={{ color: '#d32f2f', p: { xs: 0.5, md: 1 } }}
+                                  title="Delete"
+                                >
+                                  <DeleteIcon fontSize="small" />
+                                </IconButton>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Box>
               ))}
-            </tbody>
-          </table>
-        </div>
-      ))}
+              <Typography sx={{ mt: 2, color: '#1a2526' }}>
+                Routes: {filteredRoutes.length} of {routePickupPointsList.length}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
 
-      {/* Add Popup */}
-      {showAddPopup && (
-        <div style={styles.popupOverlay}>
-          <div style={styles.popupContent}>
-            <h3>Add New Pickup Point</h3>
-            <input
-              type="text"
-              placeholder="Pickup Point"
-              value={newPickup.point}
-              onChange={(e) => setNewPickup({ ...newPickup, point: e.target.value })}
-              style={styles.input}
-            />
-            <input
-              type="number"
-              placeholder="Fee ($)"
-              value={newPickup.fee}
-              onChange={(e) => setNewPickup({ ...newPickup, fee: e.target.value })}
-              style={styles.input}
-            />
-            <input
-              type="number"
-              placeholder="Distance (km)"
-              value={newPickup.distance}
-              onChange={(e) => setNewPickup({ ...newPickup, distance: e.target.value })}
-              style={styles.input}
-            />
-            <input
-              type="text"
-              placeholder="Time"
-              value={newPickup.time}
-              onChange={(e) => setNewPickup({ ...newPickup, time: e.target.value })}
-              style={styles.input}
-            />
-            <div style={styles.buttonGroup}>
-              <button onClick={handleSaveAdd} style={styles.saveButton}>Save</button>
-              <button onClick={handleCancelPopup} style={styles.cancelButton}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Popup */}
-      {showEditPopup && (
-        <div style={styles.popupOverlay}>
-          <div style={styles.popupContent}>
-            <h3>Edit Pickup Point</h3>
-            <input
-              type="text"
-              placeholder="Pickup Point"
-              value={editData.point}
-              onChange={(e) => setEditData({ ...editData, point: e.target.value })}
-              style={styles.input}
-            />
-            <input
-              type="number"
-              placeholder="Fee ($)"
-              value={editData.fee}
-              onChange={(e) => setEditData({ ...editData, fee: e.target.value })}
-              style={styles.input}
-            />
-            <input
-              type="number"
-              placeholder="Distance (km)"
-              value={editData.distance}
-              onChange={(e) => setEditData({ ...editData, distance: e.target.value })}
-              style={styles.input}
-            />
-            <input
-              type="text"
-              placeholder="Time"
-              value={editData.time}
-              onChange={(e) => setEditData({ ...editData, time: e.target.value })}
-              style={styles.input}
-            />
-            <div style={styles.buttonGroup}>
-              <button onClick={handleSaveEdit} style={styles.saveButton}>Save</button>
-              <button onClick={handleCancelPopup} style={styles.cancelButton}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Success Popup */}
-      {showSuccess && (
-        <div style={styles.popupSuccess}>
-          Operation successful!
-        </div>
-      )}
+      {/* Add/Edit Popup */}
+      <Dialog open={showAddPopup || showEditPopup} onClose={handleCancelPopup} maxWidth="sm" fullWidth>
+        <DialogTitle>{showEditPopup ? 'Edit Route Pickup Point' : 'Add New Route Pickup Point'}</DialogTitle>
+        <DialogContent>
+          <FormControl fullWidth sx={{ mb: 2, mt: 1 }} variant="outlined">
+            <InputLabel>Route</InputLabel>
+            <Select
+              name="routeId"
+              value={showEditPopup ? editPickup.routeId : newPickup.routeId}
+              onChange={(e) => (showEditPopup ? setEditPickup({ ...editPickup, routeId: e.target.value }) : setNewPickup({ ...newPickup, routeId: e.target.value }))}
+              label="Route"
+              size="small"
+            >
+              <MenuItem value=""><em>Select</em></MenuItem>
+              {transportRoutesList.map((route) => (
+                <MenuItem key={route._id} value={route._id}>{route.title}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl fullWidth sx={{ mb: 2 }} variant="outlined">
+            <InputLabel>Pickup Point</InputLabel>
+            <Select
+              name="pointId"
+              value={showEditPopup ? editPickup.pointId : newPickup.pointId}
+              onChange={(e) => (showEditPopup ? setEditPickup({ ...editPickup, pointId: e.target.value }) : setNewPickup({ ...newPickup, pointId: e.target.value }))}
+              label="Pickup Point"
+              size="small"
+            >
+              <MenuItem value=""><em>Select</em></MenuItem>
+              {pickupPointsList.map((point) => (
+                <MenuItem key={point._id} value={point._id}>{point.name}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <TextField
+            fullWidth
+            label="Monthly Fee ($)"
+            name="fee"
+            type="number"
+            value={showEditPopup ? editPickup.fee : newPickup.fee}
+            onChange={(e) => (showEditPopup ? setEditPickup({ ...editPickup, fee: e.target.value }) : setNewPickup({ ...newPickup, fee: e.target.value }))}
+            variant="outlined"
+            size="small"
+            sx={{ mb: 2 }}
+            required
+          />
+          <TextField
+            fullWidth
+            label="Distance (km)"
+            name="distance"
+            type="number"
+            value={showEditPopup ? editPickup.distance : newPickup.distance}
+            onChange={(e) => (showEditPopup ? setEditPickup({ ...editPickup, distance: e.target.value }) : setNewPickup({ ...newPickup, distance: e.target.value }))}
+            variant="outlined"
+            size="small"
+            sx={{ mb: 2 }}
+            required
+          />
+          <TextField
+            fullWidth
+            label="Pickup Time"
+            name="time"
+            value={showEditPopup ? editPickup.time : newPickup.time}
+            onChange={(e) => (showEditPopup ? setEditPickup({ ...editPickup, time: e.target.value }) : setNewPickup({ ...newPickup, time: e.target.value }))}
+            variant="outlined"
+            size="small"
+            sx={{ mb: 2 }}
+            required
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCancelPopup} color="error">Cancel</Button>
+          <Button onClick={showEditPopup ? handleSaveEdit : handleSaveAdd} color="success">
+            {showEditPopup ? 'Update' : 'Save'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Delete Confirmation Popup */}
-      {showDelete && (
-        <div style={styles.popupDelete}>
-          <div style={styles.popupContent}>
-            <p>Are you sure you want to delete this pickup point?</p>
-            <div style={styles.buttonGroup}>
-              <button onClick={handleDelete} style={styles.confirmButton}>Yes</button>
-              <button onClick={handleCancelDelete} style={styles.cancelButton}>No</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
+      <Dialog open={showDelete} onClose={handleCancelDelete}>
+        <DialogTitle>Confirm Deletion</DialogTitle>
+        <DialogContent>
+          <Typography>Are you sure you want to delete this route pickup point?</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCancelDelete} color="error">No</Button>
+          <Button onClick={handleDelete} color="success">Yes</Button>
+        </DialogActions>
+      </Dialog>
 
-// Internal CSS
-const styles = {
-  container: {
-    padding: '20px',
-    fontFamily: 'Arial, sans-serif',
-    backgroundColor: "#e8c897",
-    borderRadius: '8px',
-    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
-  },
-  title: {
-    color: '#333',
-    marginBottom: '20px',
-    fontSize: '24px',
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    marginBottom: '20px',
-    alignItems: 'center',
-  },
-  search: {
-    padding: '10px',
-    width: '250px',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-    fontSize: '14px',
-  },
-  addButton: {
-    padding: '10px 20px',
-    backgroundColor: '#28a745',
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '14px',
-  },
-  routeSection: {
-    marginBottom: '30px',
-    backgroundColor: 'white',
-    borderRadius: '8px',
-    padding: '15px',
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-  },
-  routeTitle: {
-    color: '#007BFF',
-    marginBottom: '10px',
-    fontSize: '18px',
-  },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-    backgroundColor: 'white',
-  },
-  th: {
-    backgroundColor: '#007BFF',
-    color: 'white',
-    padding: '12px',
-    textAlign: 'left',
-    borderBottom: '2px solid #0056b3',
-  },
-  tr: {
-    borderBottom: '1px solid #ddd',
-  },
-  td: {
-    padding: '12px',
-    textAlign: 'left',
-    color: '#333',
-  },
-  actionButton: {
-    padding: '5px 10px',
-    marginRight: '10px',
-    backgroundColor: '#007BFF',
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '12px',
-  },
-  popupOverlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    width: '100%',
-    height: '100%',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-  },
-  popupContent: {
-    backgroundColor: 'white',
-    padding: '20px',
-    borderRadius: '8px',
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-    width: '300px',
-    textAlign: 'center',
-  },
-  input: {
-    width: '100%',
-    padding: '8px',
-    margin: '10px 0',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-    fontSize: '14px',
-  },
-  buttonGroup: {
-    marginTop: '20px',
-  },
-  saveButton: {
-    padding: '8px 15px',
-    backgroundColor: '#28a745',
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    marginRight: '10px',
-  },
-  cancelButton: {
-    padding: '8px 15px',
-    backgroundColor: '#6c757d',
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-  },
-  popupSuccess: {
-    position: 'fixed',
-    bottom: '20px',
-    right: '20px',
-    backgroundColor: '#28a745',
-    color: 'white',
-    padding: '10px 20px',
-    borderRadius: '4px',
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-    zIndex: 1000,
-    animation: 'fadeIn 0.5s',
-  },
-  popupDelete: {
-    position: 'fixed',
-    bottom: '20px',
-    right: '20px',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    width: '100%',
-    height: '100%',
-    display: 'flex',
-    justifyContent: 'flex-end',
-    alignItems: 'flex-end',
-    zIndex: 1000,
-  },
-  confirmButton: {
-    padding: '8px 15px',
-    backgroundColor: '#dc3545',
-    color: 'white',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    marginRight: '10px',
-  },
-  '@keyframes fadeIn': {
-    from: { opacity: 0 },
-    to: { opacity: 1 },
-  },
+      <Snackbar
+        open={snack.open}
+        autoHideDuration={3000}
+        onClose={() => setSnack({ ...snack, open: false })}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSnack({ ...snack, open: false })} severity={snack.severity} sx={{ width: '100%' }}>
+          {snack.message}
+        </Alert>
+      </Snackbar>
+    </Box>
+  );
 };
 
 export default RoutePickupPoint;

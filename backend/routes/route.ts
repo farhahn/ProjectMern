@@ -198,18 +198,53 @@ router.post('/expense-head', expenseHeadController.addExpenseHead);
 router.put('/expense-head/:id', expenseHeadController.updateExpenseHead);
 router.delete('/expense-head/:id', expenseHeadController.deleteExpenseHead);
 
+const transportRouteController = require('../controllers/route-controller');
+
+router.get('/transport-routes/:adminID', transportRouteController.getTransportRoutes);
+router.post('/transport-route', transportRouteController.addTransportRoute);
+router.put('/transport-route/:id', transportRouteController.updateTransportRoute);
+router.delete('/transport-route/:id', transportRouteController.deleteTransportRoute);
+
+const vehicleController = require('../controllers/vehicle-controller');
+
+// Vehicle Routes
+router.get('/vehicles/:adminID', vehicleController.getVehicles);
+router.post('/vehicle', vehicleController.addVehicle);
+router.put('/vehicle/:id', vehicleController.updateVehicle);
+router.delete('/vehicle/:id', vehicleController.deleteVehicle);
+
+
+const assignmentController = require('../controllers/assignment-controller');
+
+router.get('/assignments/:adminID', assignmentController.getAssignments);
+router.post('/assignment', assignmentController.addAssignment);
+router.put('/assignment/:id', assignmentController.updateAssignment);
+router.delete('/assignment/:id', assignmentController.deleteAssignment);
+
+
+const pickupPointController = require('../controllers/pickup-point-controller');
+
+router.get('/pickup-points/:adminID', pickupPointController.getPickupPoints);
+router.post('/pickup-point', pickupPointController.addPickupPoint);
+router.put('/pickup-point/:id', pickupPointController.updatePickupPoint);
+router.delete('/pickup-point/:id', pickupPointController.deletePickupPoint);
+
+
+const routePickupPointController = require('../controllers/route-pickup-point-controller');
+
+router.get('/route-pickup-points/:adminID', routePickupPointController.getRoutePickupPoints);
+router.post('/route-pickup-point', routePickupPointController.addRoutePickupPoint);
+router.put('/route-pickup-point/:id', routePickupPointController.updateRoutePickupPoint);
+router.delete('/route-pickup-point/:id', routePickupPointController.deleteRoutePickupPoint);
 
 
 
+const studentController = require('../controllers/student-addmission-controller');
 
-
-
-
-
-
-
-
-
+router.get('/students/:adminID', studentController.getStudents);
+router.post('/student', studentController.addStudent);
+router.put('/student/:id', studentController.updateStudent);
+router.delete('/student/:id', studentController.deleteStudent);
 
 
 

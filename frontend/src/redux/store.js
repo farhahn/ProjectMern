@@ -18,6 +18,12 @@ import visitorReducer from './FrontOffice/Enquiry/VisitorSlice.js';
 import incomeReducer from './IncomeRelated/IncomeSlice.js';
 import expenseReducer from "./expenseRelated/expenseSlice.js";
 import expenseHeadReducer from "./expenseRelated/expenseHeadSlice.js";
+import transportRouteReducer from './TransportRelated/routeSlice.js';
+import vehicleReducer from "./TransportRelated/vehicleSlice.js";
+import assignmentReducer from './TransportRelated/AssignmentSlice.js';
+import pickupPointReducer from './TransportRelated/PickupPointSlice.js';
+import routePickupPointReducer from './TransportRelated/route-pickup-pointSlice.js';
+import studentsReducer from './StudentAddmissionDetail/studentAddmissionSlice.js';
 
 // import { librariansReducer } from './librarianrelated/librarianSlice';
 
@@ -42,6 +48,12 @@ const store = configureStore({
          income: incomeReducer,
          expense: expenseReducer,
          expenseHead: expenseHeadReducer,
+         transportRoute: transportRouteReducer,
+          vehicle: vehicleReducer,
+           assignment: assignmentReducer,
+           pickupPoint: pickupPointReducer,
+           routePickupPoint: routePickupPointReducer,
+            students: studentsReducer,
         // librarians: librariansReducer, // ✅ Key should match useSelector()
     },
 });

@@ -1,367 +1,327 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import {
+  Box, Typography, TextField, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  Paper, IconButton, Snackbar, Alert, Grid, Card, CardContent, InputAdornment
+} from '@mui/material';
+import { Search as SearchIcon, Edit as EditIcon, Delete as DeleteIcon, Print as PrintIcon, Settings as SettingsIcon, Download as DownloadIcon } from '@mui/icons-material';
+import { useDispatch, useSelector } from 'react-redux';
+import { getAllTransportRoutes, createTransportRoute, updateTransportRoute, deleteTransportRoute, clearTransportRouteError } from '../../../redux/TransportRelated/routeHandle';
+import { CSVLink } from 'react-csv';
 
-const RoutesAdd = () => {
-  // Sample data for routes
-  const [routes, setRoutes] = useState([
-    { id: 1, title: 'Brooklyn Central' },
-    { id: 2, title: 'Brooklyn East' },
-    { id: 3, title: 'Brooklyn West' },
-    { id: 4, title: 'Brooklyn South' },
-    { id: 5, title: 'Brooklyn North' },
-    { id: 6, title: 'Railway Station' },
-    { id: 7, title: 'High Court' },
-    { id: 8, title: 'Vijay Nagar' },
-    { id: 9, title: 'Civil Line' },
-    { id: 10, title: 'Dindayal Chowk' },
-    { id: 11, title: 'Ranital' },
-  ]);
-
-  // State for new route, search, and edit mode
-  const [newRouteTitle, setNewRouteTitle] = useState('');
+const TransportRouteAdd = () => {
+  const [newTransportRouteTitle, setNewTransportRouteTitle] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [filteredRoutes, setFilteredRoutes] = useState(routes);
-  const [editIndex, setEditIndex] = useState(null);
+  const [editId, setEditId] = useState(null);
   const [editTitle, setEditTitle] = useState('');
+  const [snack, setSnack] = useState({ open: false, message: '', severity: 'success' });
 
-  // Handle new route input change
-  const handleRouteTitleChange = (e) => {
-    setNewRouteTitle(e.target.value);
-  };
+  const dispatch = useDispatch();
+  const transportRouteState = useSelector((state) => state.transportRoute || { transportRoutesList: [], loading: false, error: null });
+  const userState = useSelector((state) => state.user || {});
+  const { transportRoutesList, loading, error } = transportRouteState;
+  const adminID = userState.currentUser?._id;
 
-  // Handle save new route
-  const handleSaveRoute = () => {
-    if (newRouteTitle.trim()) {
-      const newRoute = { id: Date.now(), title: newRouteTitle.trim() };
-      setRoutes([...routes, newRoute]);
-      setFilteredRoutes([...routes, newRoute]);
-      setNewRouteTitle('');
-      alert('Route added successfully!');
+  useEffect(() => {
+    if (adminID) {
+      dispatch(getAllTransportRoutes(adminID));
     } else {
-      alert('Please enter a route title!');
+      setSnack({ open: true, message: 'Please log in to view transport routes', severity: 'error' });
     }
+  }, [dispatch, adminID]);
+
+  useEffect(() => {
+    if (error) {
+      setSnack({ open: true, message: error, severity: 'error' });
+      dispatch(clearTransportRouteError());
+    }
+  }, [error, dispatch]);
+
+  const filteredTransportRoutes = transportRoutesList.filter((transportRoute) =>
+    transportRoute.title.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleSaveTransportRoute = () => {
+    if (!newTransportRouteTitle.trim()) {
+      setSnack({ open: true, message: 'Transport route title is required', severity: 'warning' });
+      return;
+    }
+    if (!adminID) {
+      setSnack({ open: true, message: 'Please log in to add transport routes', severity: 'error' });
+      return;
+    }
+    dispatch(createTransportRoute({ title: newTransportRouteTitle }, adminID))
+      .then(() => {
+        setNewTransportRouteTitle('');
+        setSnack({ open: true, message: 'Transport route added successfully', severity: 'success' });
+      })
+      .catch((error) => {
+        const errorMessage = error.message.includes('already exists')
+          ? 'Transport route title already exists'
+          : error.message.includes('404')
+            ? 'Transport route service not found'
+            : 'Failed to add transport route';
+        setSnack({ open: true, message: errorMessage, severity: 'error' });
+      });
   };
 
-  // Handle search input change
-  const handleSearch = (e) => {
-    const term = e.target.value.toLowerCase();
-    setSearchTerm(term);
-    const filtered = routes.filter(route =>
-      route.title.toLowerCase().includes(term)
-    );
-    setFilteredRoutes(filtered);
+  const handleEdit = (transportRoute) => {
+    setEditId(transportRoute._id);
+    setEditTitle(transportRoute.title);
   };
 
-  // Handle delete route
+  const handleSaveEdit = () => {
+    if (!editTitle.trim()) {
+      setSnack({ open: true, message: 'Transport route title is required', severity: 'warning' });
+      return;
+    }
+    if (!adminID) {
+      setSnack({ open: true, message: 'Please log in to update transport routes', severity: 'error' });
+      return;
+    }
+    dispatch(updateTransportRoute({ id: editId, transportRoute: { title: editTitle }, adminID }))
+      .then(() => {
+        setEditId(null);
+        setEditTitle('');
+        setSnack({ open: true, message: 'Transport route updated successfully', severity: 'success' });
+      })
+      .catch((error) => {
+        const errorMessage = error.message.includes('already exists')
+          ? 'Transport route title already exists'
+          : error.message.includes('404')
+            ? 'Transport route not found'
+            : 'Failed to update transport route';
+        setSnack({ open: true, message: errorMessage, severity: 'error' });
+      });
+  };
+
   const handleDelete = (id) => {
-    if (window.confirm('Are you sure you want to delete this route?')) {
-      const updatedRoutes = routes.filter(route => route.id !== id);
-      setRoutes(updatedRoutes);
-      setFilteredRoutes(updatedRoutes);
-      alert('Route deleted successfully!');
+    if (!adminID) {
+      setSnack({ open: true, message: 'Please log in to delete transport routes', severity: 'error' });
+      return;
+    }
+    if (window.confirm('Are you sure you want to delete this transport route?')) {
+      dispatch(deleteTransportRoute(id, adminID))
+        .then(() => {
+          setSnack({ open: true, message: 'Transport route deleted successfully', severity: 'info' });
+        })
+        .catch((error) => {
+          const errorMessage = error.message.includes('404')
+            ? 'Transport route not found'
+            : 'Failed to delete transport route';
+          setSnack({ open: true, message: errorMessage, severity: 'error' });
+        });
     }
   };
 
-  // Handle edit mode
-  const handleEdit = (index, title) => {
-    setEditIndex(index);
-    setEditTitle(title);
-  };
-
-  // Handle save edited route
-  const handleSaveEdit = (id) => {
-    if (editTitle.trim()) {
-      const updatedRoutes = routes.map(route =>
-        route.id === id ? { ...route, title: editTitle.trim() } : route
-      );
-      setRoutes(updatedRoutes);
-      setFilteredRoutes(updatedRoutes);
-      setEditIndex(null);
-      setEditTitle('');
-      alert('Route updated successfully!');
-    } else {
-      alert('Please enter a route title!');
-    }
-  };
-
-  // Handle export (placeholder)
   const handleExport = () => {
-    alert('Export functionality triggered!');
-    // Add actual export logic here (e.g., CSV download)
+    setSnack({ open: true, message: 'Exporting transport routes as CSV', severity: 'info' });
   };
 
-  // Handle print (placeholder)
   const handlePrint = () => {
     window.print();
-    alert('Print functionality triggered!');
+    setSnack({ open: true, message: 'Printing transport routes', severity: 'info' });
   };
 
-  // Handle settings (placeholder)
   const handleSettings = () => {
-    alert('Settings functionality triggered!');
-    // Add actual settings logic here
+    setSnack({ open: true, message: 'Settings functionality not implemented', severity: 'warning' });
   };
+
+  const handleCloseSnack = () => setSnack({ ...snack, open: false });
+
+  const csvData = filteredTransportRoutes.map((transportRoute) => ({
+    Title: transportRoute.title,
+  }));
 
   return (
-    <div style={styles.container}>
-      <div style={styles.wrapper}>
-        <div style={styles.createSection}>
-          <h3 style={styles.sectionTitle}>Create Route</h3>
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Route Title *</label>
-            <input
-              type="text"
-              value={newRouteTitle}
-              onChange={handleRouteTitleChange}
-              style={styles.input}
-              placeholder="Enter route title"
-            />
-          </div>
-          <button style={styles.saveButton} onClick={handleSaveRoute}>
-            Save
-          </button>
-        </div>
+    <Box sx={{ p: { xs: 2, md: 4 }, bgcolor: '#f4f6f8', minHeight: '100vh' }}>
+      <Typography
+        variant="h4"
+        sx={{
+          textAlign: 'center',
+          fontWeight: 700,
+          color: '#1a2526',
+          mb: 4,
+          fontSize: { xs: '1.5rem', md: '2.125rem' },
+        }}
+      >
+        Transport Route Management
+      </Typography>
 
-        <div style={styles.listSection}>
-          <h3 style={styles.sectionTitle}>Route List</h3>
-          <div style={styles.header}>
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={handleSearch}
-              placeholder="Search..."
-              style={styles.searchInput}
-            />
-            <div style={styles.iconGroup}>
-              <span
-                style={styles.icon}
-                onClick={handleExport}
-                title="Export"
+      <Grid container spacing={3}>
+        {/* Create Transport Route Section */}
+        <Grid item xs={12} md={4}>
+          <Card sx={{ p: 2, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+            <CardContent>
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, color: '#1a2526' }}>
+                Create Transport Route
+              </Typography>
+              <TextField
+                fullWidth
+                label="Transport Route Title"
+                value={newTransportRouteTitle}
+                onChange={(e) => setNewTransportRouteTitle(e.target.value)}
+                variant="outlined"
+                size="small"
+                sx={{ mb: 2 }}
+                required
+              />
+              <Button
+                variant="contained"
+                color="success"
+                onClick={handleSaveTransportRoute}
+                sx={{ borderRadius: '20px', textTransform: 'none' }}
+                fullWidth
               >
-                📤
-              </span>
-              <span
-                style={styles.icon}
-                onClick={handlePrint}
-                title="Print"
-              >
-                🖨️
-              </span>
-              <span
-                style={styles.icon}
-                onClick={handleSettings}
-                title="Settings"
-              >
-                ⚙️
-              </span>
-            </div>
-          </div>
-          <table style={styles.table}>
-            <thead>
-              <tr style={styles.headerRow}>
-                <th style={styles.headerCell}>Route Title</th>
-                <th style={styles.headerCell}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredRoutes.map((route, index) => (
-                <tr key={route.id} style={styles.row}>
-                  <td style={styles.cell}>
-                    {editIndex === index ? (
-                      <input
-                        type="text"
-                        value={editTitle}
-                        onChange={(e) => setEditTitle(e.target.value)}
-                        style={styles.editInput}
-                      />
+                Save
+              </Button>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Transport Route List Section */}
+        <Grid item xs={12} md={8}>
+          <Card sx={{ p: 2, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+            <CardContent>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6" sx={{ fontWeight: 600, color: '#1a2526' }}>
+                  Transport Route List
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <CSVLink
+                    data={csvData}
+                    filename="transport-routes.csv"
+                    style={{ textDecoration: 'none' }}
+                    onClick={handleExport}
+                  >
+                    <IconButton sx={{ color: '#666' }} title="Export">
+                      <DownloadIcon />
+                    </IconButton>
+                  </CSVLink>
+                  <IconButton sx={{ color: '#666' }} onClick={handlePrint} title="Print">
+                    <PrintIcon />
+                  </IconButton>
+                  <IconButton sx={{ color: '#666' }} onClick={handleSettings} title="Settings">
+                    <SettingsIcon />
+                  </IconButton>
+                </Box>
+              </Box>
+              <TextField
+                fullWidth
+                label="Search transport routes"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                variant="outlined"
+                size="small"
+                sx={{ mb: 2 }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+              <TableContainer component={Paper} sx={{ boxShadow: 'none' }}>
+                <Table>
+                  <TableHead>
+                    <TableRow sx={{ bgcolor: '#1a2526' }}>
+                      <TableCell sx={{ color: '#fff', fontWeight: 600, fontSize: { xs: '0.75rem', md: '0.875rem' }, p: { xs: 1, md: 2 } }}>
+                        Transport Route Title
+                      </TableCell>
+                      <TableCell sx={{ color: '#fff', fontWeight: 600, fontSize: { xs: '0.75rem', md: '0.875rem' }, p: { xs: 1, md: 2 } }}>
+                        Action
+                      </TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {loading ? (
+                      <TableRow>
+                        <TableCell colSpan={2} sx={{ textAlign: 'center' }}>
+                          Loading...
+                        </TableCell>
+                      </TableRow>
+                    ) : filteredTransportRoutes.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={2} sx={{ textAlign: 'center', p: 4, color: '#666' }}>
+                          No transport routes found
+                        </TableCell>
+                      </TableRow>
                     ) : (
-                      route.title
-                    )}
-                  </td>
-                  <td style={styles.cell}>
-                    {editIndex === index ? (
-                      <span
-                        style={styles.actionIcon}
-                        onClick={() => handleSaveEdit(route.id)}
-                        title="Save"
-                      >
-                        ✅
-                      </span>
-                    ) : (
-                      <>
-                        <span
-                          style={styles.actionIcon}
-                          onClick={() => handleEdit(index, route.title)}
-                          title="Edit"
+                      filteredTransportRoutes.map((transportRoute, idx) => (
+                        <TableRow
+                          key={transportRoute._id}
+                          sx={{
+                            bgcolor: idx % 2 ? '#fff' : '#f9f9f9',
+                            '&:hover': { bgcolor: '#e0f7fa' },
+                          }}
                         >
-                          ✏️
-                        </span>
-                        <span
-                          style={styles.actionIcon}
-                          onClick={() => handleDelete(route.id)}
-                          title="Delete"
-                        >
-                          ❌
-                        </span>
-                      </>
+                          <TableCell sx={{ p: { xs: 1, md: 2 }, fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
+                            {editId === transportRoute._id ? (
+                              <TextField
+                                value={editTitle}
+                                onChange={(e) => setEditTitle(e.target.value)}
+                                variant="outlined"
+                                size="small"
+                                sx={{ width: '90%' }}
+                              />
+                            ) : (
+                              transportRoute.title
+                            )}
+                          </TableCell>
+                          <TableCell sx={{ p: { xs: 1, md: 2 } }}>
+                            {editId === transportRoute._id ? (
+                              <IconButton
+                                onClick={handleSaveEdit}
+                                sx={{ color: '#4caf50', p: { xs: 0.5, md: 1 } }}
+                                title="Save"
+                              >
+                                ✅
+                              </IconButton>
+                            ) : (
+                              <>
+                                <IconButton
+                                  onClick={() => handleEdit(transportRoute)}
+                                  sx={{ color: '#1976d2', p: { xs: 0.5, md: 1 } }}
+                                  title="Edit"
+                                >
+                                  <EditIcon fontSize="small" />
+                                </IconButton>
+                                <IconButton
+                                  onClick={() => handleDelete(transportRoute._id)}
+                                  sx={{ color: '#d32f2f', p: { xs: 0.5, md: 1 } }}
+                                  title="Delete"
+                                >
+                                  <DeleteIcon fontSize="small" />
+                                </IconButton>
+                              </>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))
                     )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div style={styles.footer}>
-            <span>Records: 1 to {filteredRoutes.length} of {routes.length}</span>
-            <div style={styles.pagination}>
-              <button style={styles.paginationButton}>1</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              <Typography sx={{ mt: 2, color: '#1a2526' }}>
+                Records: {filteredTransportRoutes.length} of {transportRoutesList.length}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      <Snackbar
+        open={snack.open}
+        autoHideDuration={3000}
+        onClose={handleCloseSnack}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={handleCloseSnack} severity={snack.severity} sx={{ width: '100%' }}>
+          {snack.message}
+        </Alert>
+      </Snackbar>
+    </Box>
   );
 };
 
-// Internal CSS Styles
-const styles = {
-  container: {
-    padding: '20px',
-    backgroundColor: '#f5f5f5',
-    fontFamily: 'Arial, sans-serif',
-    maxWidth: '1000px',
-    margin: '20px auto',
-    borderRadius: '5px',
-    boxShadow: '0 2px 5px rgba(0, 0, 0, 0.1)',
-  },
-  wrapper: {
-    display: 'flex',
-    gap: '20px',
-  },
-  createSection: {
-    flex: '1',
-    backgroundColor: '#fff',
-    padding: '15px',
-    borderRadius: '5px',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-  },
-  listSection: {
-    flex: '2',
-    backgroundColor: '#fff',
-    padding: '15px',
-    borderRadius: '5px',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-  },
-  sectionTitle: {
-    color: '#333',
-    marginBottom: '15px',
-    fontSize: '18px',
-    fontWeight: 'bold',
-  },
-  formGroup: {
-    marginBottom: '15px',
-  },
-  label: {
-    display: 'block',
-    color: '#666',
-    marginBottom: '5px',
-  },
-  input: {
-    width: '100%',
-    padding: '8px',
-    border: '1px solid #ccc',
-    borderRadius: '4px',
-    boxSizing: 'border-box',
-  },
-  editInput: {
-    width: '90%',
-    padding: '8px',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-    fontSize: '14px',
-  },
-  saveButton: {
-    backgroundColor: '#6c757d',
-    color: '#fff',
-    padding: '8px 16px',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    transition: 'background-color 0.3s',
-  },
-  saveButtonHover: {
-    backgroundColor: '#5a6268',
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '15px',
-  },
-  searchInput: {
-    padding: '8px',
-    width: '200px',
-    border: '1px solid #ccc',
-    borderRadius: '4px',
-  },
-  iconGroup: {
-    display: 'flex',
-    gap: '10px',
-  },
-  icon: {
-    cursor: 'pointer',
-    fontSize: '16px',
-    color: '#666',
-    transition: 'color 0.3s',
-  },
-  iconHover: {
-    color: '#000',
-  },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-  },
-  headerRow: {
-    backgroundColor: '#f8f9fa',
-  },
-  headerCell: {
-    padding: '10px',
-    textAlign: 'left',
-    borderBottom: '2px solid #dee2e6',
-  },
-  row: {
-    borderBottom: '1px solid #dee2e6',
-  },
-  cell: {
-    padding: '10px',
-    textAlign: 'left',
-  },
-  actionIcon: {
-    cursor: 'pointer',
-    marginRight: '10px',
-    fontSize: '16px',
-    color: '#666',
-    transition: 'color 0.3s',
-  },
-  actionIconHover: {
-    color: '#e74c3c',
-  },
-  footer: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: '15px',
-    color: '#666',
-  },
-  pagination: {
-    display: 'flex',
-    gap: '5px',
-  },
-  paginationButton: {
-    padding: '5px 10px',
-    border: '1px solid #ccc',
-    backgroundColor: '#fff',
-    borderRadius: '4px',
-    cursor: 'pointer',
-  },
-};
-
-export default RoutesAdd;
+export default TransportRouteAdd;
