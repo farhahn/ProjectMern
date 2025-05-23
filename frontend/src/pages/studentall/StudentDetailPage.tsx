@@ -1,44 +1,135 @@
-import React from "react";
-import { useParams, Link } from "react-router-dom";
+import React, { useEffect, useState } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import { Box, Typography, TextField, Button, Select, MenuItem, FormControl, InputLabel, CircularProgress } from '@mui/material';
+import { fetchClasses, searchStudents, clearSearchError } from '../../redux/StudentAddmissionDetail/searchStudentHandle';
 
 const StudentDetailPage = () => {
   const { id } = useParams();
+  const dispatch = useDispatch();
+  const searchState = useSelector((state) => state.searchStudent || {});
+  const userState = useSelector((state) => state.user || {});
+  const { classes, searchResults, loading, error } = searchState;
+  const adminID = userState.currentUser?._id;
 
-  // Dummy student data (in real case, fetch from API)
-  const studentData = {
-    1: { admissionNo: "12345", name: "John Doe", rollNo: "10", class: "12", fatherName: "Mr. Doe", dob: "2005-10-12", gender: "Male", mobile: "9876543210" },
-    2: { admissionNo: "12346", name: "Jane Smith", rollNo: "15", class: "10", fatherName: "Mr. Smith", dob: "2006-08-20", gender: "Female", mobile: "9876543211" }
+  const [classId, setClassId] = useState('');
+  const [section, setSection] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    if (adminID) {
+      dispatch(fetchClasses(adminID));
+    }
+    if (adminID && id) {
+      setSearchQuery(id);
+      dispatch(searchStudents({ rollNo: id, adminID }));
+    }
+    return () => {
+      dispatch(clearSearchError());
+    };
+  }, [dispatch, adminID, id]);
+
+  const handleSearch = () => {
+    if (adminID) {
+      dispatch(searchStudents({
+        rollNo: searchQuery,
+        admissionNo: searchQuery,
+        classId,
+        section,
+        adminID,
+      }));
+    }
   };
 
-  const student = studentData[Number(id)]; // Convert id to number
-
   return (
-    <div style={{ background: "#e8c897", minHeight: "100vh", padding: "40px 0" }}>
-      <div style={{ maxWidth: "600px", margin: "auto", padding: "20px", background: "white", borderRadius: "12px", boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)" }}>
-        <h2 style={{ textAlign: "center", fontSize: "24px", fontWeight: "bold", marginBottom: "20px" }}>📄 Student Details</h2>
+    <Box sx={{ background: '#e8c897', minHeight: '100vh', padding: '40px 0' }}>
+      <Box sx={{ maxWidth: '600px', margin: 'auto', padding: '20px', background: 'white', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)' }}>
+        <Typography variant="h5" align="center" sx={{ fontWeight: 'bold', marginBottom: '20px' }}>
+          📄 Student Search
+        </Typography>
 
-        {student ? (
-          <div>
-            <p><strong>Admission No:</strong> {student.admissionNo}</p>
-            <p><strong>Name:</strong> {student.name}</p>
-            <p><strong>Roll No:</strong> {student.rollNo}</p>
-            <p><strong>Class:</strong> {student.class}</p>
-            <p><strong>Father's Name:</strong> {student.fatherName}</p>
-            <p><strong>Date of Birth:</strong> {student.dob}</p>
-            <p><strong>Gender:</strong> {student.gender}</p>
-            <p><strong>Mobile No:</strong> {student.mobile}</p>
-          </div>
-        ) : (
-          <p style={{ textAlign: "center", fontSize: "18px", color: "red" }}>🚫 Student not found.</p>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '20px' }}>
+          <FormControl fullWidth>
+            <InputLabel>Class</InputLabel>
+            <Select
+              value={classId}
+              onChange={(e) => setClassId(e.target.value)}
+              label="Class"
+            >
+              <MenuItem value="">Select Class</MenuItem>
+              {classes.map((cls) => (
+                <MenuItem key={cls._id} value={cls._id}>{cls.name}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <FormControl fullWidth>
+            <InputLabel>Section</InputLabel>
+            <Select
+              value={section}
+              onChange={(e) => setSection(e.target.value)}
+              label="Section"
+            >
+              <MenuItem value="">Select Section</MenuItem>
+              {classId && classes.find((cls) => cls._id === classId)?.sections?.map((sec) => (
+                <MenuItem key={sec} value={sec}>{sec}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <TextField
+            label="Roll No or Admission No"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            fullWidth
+          />
+
+          <Button
+            variant="contained"
+            onClick={handleSearch}
+            disabled={loading}
+            sx={{ background: '#007bff' }}
+          >
+            {loading ? <CircularProgress size={24} color="inherit" /> : 'Search'}
+          </Button>
+        </Box>
+
+        {error && (
+          <Typography color="error" align="center" sx={{ marginBottom: '20px' }}>
+            🚫 {error}
+          </Typography>
         )}
 
-        <Link to="/Admin/studentall/studentdetail" style={{ textDecoration: "none" }}>
-          <button style={{ background: "#007bff", color: "white", padding: "8px 12px", border: "none", cursor: "pointer", borderRadius: "5px", marginTop: "20px" }}>
+        {searchResults.length > 0 ? (
+          searchResults.map((student) => (
+            <Box key={student._id} sx={{ marginBottom: '20px' }}>
+              <Typography><strong>Admission No:</strong> {student.admissionNo}</Typography>
+              <Typography><strong>Name:</strong> {student.firstName} {student.lastName}</Typography>
+              <Typography><strong>Roll No:</strong> {student.rollNo}</Typography>
+              <Typography><strong>Class:</strong> {student.class?.name || 'N/A'}</Typography>
+              <Typography><strong>Section:</strong> {student.section || 'N/A'}</Typography>
+              <Typography><strong>Father's Name:</strong> {student.parents?.father?.name || 'N/A'}</Typography>
+              <Typography><strong>Date of Birth:</strong> {new Date(student.dob).toLocaleDateString()}</Typography>
+              <Typography><strong>Gender:</strong> {student.gender}</Typography>
+              <Typography><strong>Mobile No:</strong> {student.parents?.father?.phone || 'N/A'}</Typography>
+            </Box>
+          ))
+        ) : !loading && !error ? (
+          <Typography color="error" align="center">
+            🚫 No students found.
+          </Typography>
+        ) : null}
+
+        <Link to="/Admin/students" style={{ textDecoration: 'none' }}>
+          <Button
+            variant="outlined"
+            sx={{ marginTop: '20px', width: '100%' }}
+          >
             🔙 Back to Students
-          </button>
+          </Button>
         </Link>
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 };
 

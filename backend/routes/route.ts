@@ -242,11 +242,15 @@ router.delete('/route-pickup-point/:id', routePickupPointController.deleteRouteP
 const studentController = require('../controllers/student-addmission-controller');
 
 router.get('/students/:adminID', studentController.getStudents);
+router.get('/student/:id', studentController.getStudentById);
 router.post('/student', studentController.addStudent);
 router.put('/student/:id', studentController.updateStudent);
 router.delete('/student/:id', studentController.deleteStudent);
 
+const searchStudentController = require('../controllers/search-student-controller');
 
+router.get('/search-class/:adminID', searchStudentController.getClasses);
+router.get('/search-student', searchStudentController.searchStudents);
 
 
 

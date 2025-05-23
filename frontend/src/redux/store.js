@@ -24,6 +24,7 @@ import assignmentReducer from './TransportRelated/AssignmentSlice.js';
 import pickupPointReducer from './TransportRelated/PickupPointSlice.js';
 import routePickupPointReducer from './TransportRelated/route-pickup-pointSlice.js';
 import studentsReducer from './StudentAddmissionDetail/studentAddmissionSlice.js';
+import searchStudentReducer from './StudentAddmissionDetail/searchStudentSlice.js';
 
 // import { librariansReducer } from './librarianrelated/librarianSlice';
 
@@ -54,6 +55,7 @@ const store = configureStore({
            pickupPoint: pickupPointReducer,
            routePickupPoint: routePickupPointReducer,
             students: studentsReducer,
+             searchStudent: searchStudentReducer,
         // librarians: librariansReducer, // ✅ Key should match useSelector()
     },
 });
