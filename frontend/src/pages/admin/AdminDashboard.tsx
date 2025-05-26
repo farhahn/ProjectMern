@@ -108,6 +108,7 @@ import ItemList from './inventory/ItemList.tsx';
 import ItemCategory from './inventory/ItemCategory.tsx';
 import ItemStore from './inventory/ItemStore.tsx';
 import ItemSupplier from './inventory/ItemSupplier.tsx';
+import DisableStudents from '../studentall/DisableStudents.tsx';
 
 
 
@@ -207,6 +208,7 @@ const AdminDashboard = () => {
                         <Route path="/Admin/class/addstudents/:id" element={<AddStudent situation="Class" />} />
 
                         {/* Student */}
+                        <Route path="/Admin/studentall/disablestudents" element={<DisableStudents />} />
                         <Route path="/Admin/studentall/disablereason" element={<DisableReason />} />
                         <Route path="/Admin/studentall/housestudent" element={<HouseStudent />} />
                         <Route path="/Admin/studentall/bulkdeletestudents" element={<BulkDeleteStudents />} />

@@ -1,250 +1,232 @@
 const mongoose = require('mongoose');
-const Student = require('../models/student-addmission-model');
-const Fclass = require('../models/fclass-model');
-const TransportRoute = require('../models/route-model');
-const PickupPoint = require('../models/pickup-point-model');
+const AdmissionForm = require('../models/student-addmission-model');
+const { sanitize } = require('express-mongo-sanitize');
 
-exports.getStudents = async (req, res) => {
+const sendResponse = (res, status, message, data = null, count = null) => {
+  const response = { message };
+  if (data !== null) response.data = data;
+  if (count !== null) response.count = count;
+  return res.status(status).json(response);
+};
+
+exports.getAdmissionForms = async (req, res) => {
   try {
     const adminID = req.params.adminID;
+
     if (!mongoose.Types.ObjectId.isValid(adminID)) {
-      console.error(`Invalid adminID format: ${adminID}`);
-      return res.status(400).json({ message: 'Invalid adminID format' });
+      return sendResponse(res, 400, 'Invalid adminID format');
     }
-    console.log(`Fetching students for adminID: ${adminID}`);
-    const students = await Student.find({ admin: new mongoose.Types.ObjectId(adminID) })
-      .populate('class', 'name')
-      .populate('route', 'title')
-      .populate('pickupPoint', 'name')
+
+    // Fetch admission forms without populate first
+    const admissionForms = await AdmissionForm.find({ school: new mongoose.Types.ObjectId(adminID) })
       .sort({ createdAt: -1 })
       .lean();
-    console.log(`Found ${students.length} students for adminID: ${adminID}`);
-    res.status(200).json({
-      message: 'Students fetched successfully',
-      data: students,
-      count: students.length,
-    });
+
+    // Manually populate valid references
+    const populatedForms = await Promise.all(
+      admissionForms.map(async (form) => {
+        let populatedForm = { ...form };
+
+        // Populate classId
+        if (form.classId && mongoose.Types.ObjectId.isValid(form.classId)) {
+          try {
+            const classDoc = await mongoose.model('Class').findById(form.classId, 'name').lean();
+            populatedForm.classId = classDoc ? { _id: form.classId, name: classDoc.name } : null;
+          } catch (err) {
+            console.error(`Failed to populate classId ${form.classId}:`, err.message);
+            populatedForm.classId = null;
+          }
+        } else {
+          populatedForm.classId = null;
+        }
+
+        // Populate routeId
+        if (form.routeId && mongoose.Types.ObjectId.isValid(form.routeId)) {
+          try {
+            const routeDoc = await mongoose.model('TransportRoute').findById(form.routeId, 'title').lean();
+            populatedForm.routeId = routeDoc ? { _id: form.routeId, title: routeDoc.title } : null;
+          } catch (err) {
+            console.error(`Failed to populate routeId ${form.routeId}:`, err.message);
+            populatedForm.routeId = null;
+          }
+        } else {
+          populatedForm.routeId = null;
+        }
+
+        // Populate pickupPointId
+        if (form.pickupPointId && mongoose.Types.ObjectId.isValid(form.pickupPointId)) {
+          try {
+            const pickupDoc = await mongoose.model('PickupPoint').findById(form.pickupPointId, 'name').lean();
+            populatedForm.pickupPointId = pickupDoc ? { _id: form.pickupPointId, name: pickupDoc.name } : null;
+          } catch (err) {
+            console.error(`Failed to populate pickupPointId ${form.pickupPointId}:`, err.message);
+            populatedForm.pickupPointId = null;
+          }
+        } else {
+          populatedForm.pickupPointId = null;
+        }
+
+        return populatedForm;
+      })
+    );
+
+    return sendResponse(res, 200, 'Admission forms fetched successfully', populatedForms, populatedForms.length);
   } catch (error) {
-    console.error('Error fetching students:', error.message);
-    res.status(500).json({ message: 'Server error while fetching students', error: error.message });
+    console.error('Error fetching admission forms:', error.message, error.stack);
+    return sendResponse(res, 500, `Server error while fetching admission forms: ${error.message}`);
   }
 };
 
-exports.getStudentById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const adminID = req.query.adminID;
-    if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(adminID)) {
-      return res.status(400).json({ message: 'Invalid ID format' });
-    }
-    const student = await Student.findOne({ _id: id, admin: new mongoose.Types.ObjectId(adminID) })
-      .populate('class', 'name')
-      .populate('route', 'title')
-      .populate('pickupPoint', 'name')
-      .lean();
-    if (!student) {
-      return res.status(404).json({ message: 'Student not found' });
-    }
-    console.log('Fetched student:', student); // Add logging to inspect data
-    res.status(200).json({
-      message: 'Student fetched successfully',
-      data: student,
-    });
-  } catch (error) {
-    console.error('Error fetching student:', error.message);
-    res.status(500).json({ message: 'Server error while fetching student', error: error.message });
-  }
-};
-
-exports.addStudent = async (req, res) => {
+exports.addAdmissionForm = async (req, res) => {
   try {
     const {
-      admissionNo, rollNo, classId, section, firstName, lastName, gender, dob,
-      routeId, pickupPointId, feesMonth, fees, parents, additionalDetails, adminID
-    } = req.body;
-    if (!admissionNo || !rollNo || !classId || !section || !firstName || !lastName || !gender || !dob || !parents?.father || !parents?.mother || !adminID) {
-      return res.status(400).json({ message: 'Missing required fields' });
-    }
-    if (!mongoose.Types.ObjectId.isValid(adminID) || !mongoose.Types.ObjectId.isValid(classId) ||
-        (routeId && !mongoose.Types.ObjectId.isValid(routeId)) ||
-        (pickupPointId && !mongoose.Types.ObjectId.isValid(pickupPointId))) {
-      return res.status(400).json({ message: 'Invalid ID format' });
-    }
-    const existingStudent = await Student.findOne({ admissionNo, admin: new mongoose.Types.ObjectId(adminID) });
-    if (existingStudent) {
-      return res.status(400).json({ message: 'Admission number already exists' });
-    }
-    const classExists = await Fclass.findById(classId);
-    if (!classExists) {
-      return res.status(404).json({ message: 'Class not found' });
-    }
-    if (!classExists.sections.includes(section)) {
-      return res.status(400).json({ message: 'Invalid section for selected class' });
-    }
-    if (routeId) {
-      const routeExists = await TransportRoute.findById(routeId);
-      if (!routeExists) {
-        return res.status(404).json({ message: 'Route not found' });
-      }
-    }
-    if (pickupPointId) {
-      const pointExists = await PickupPoint.findById(pickupPointId);
-      if (!pointExists) {
-        return res.status(404).json({ message: 'Pickup point not found' });
-      }
-    }
-    const newStudent = new Student({
       admissionNo,
       rollNo,
-      class: new mongoose.Types.ObjectId(classId),
+      classId,
+      section,
+      firstName,
+      lastName,
+      gender,
+      dob,
+      routeId,
+      pickupPointId,
+      feesMonth,
+      fees,
+      parents,
+      additionalDetails,
+      adminID,
+    } = sanitize(req.body);
+
+    if (!admissionNo || !classId || !section || !firstName || !dob || !adminID) {
+      return sendResponse(res, 400, 'Missing required fields: admissionNo, classId, section, firstName, dob, adminID');
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(adminID) || !mongoose.Types.ObjectId.isValid(classId)) {
+      return sendResponse(res, 400, 'Invalid adminID or classId format');
+    }
+
+    if (dob && isNaN(new Date(dob).getTime())) {
+      return sendResponse(res, 400, 'Invalid date format for DOB');
+    }
+
+    if (fees && Array.isArray(fees)) {
+      for (const fee of fees) {
+        if (!fee.feeType || !fee.dueDate || !fee.amount || isNaN(new Date(fee.dueDate).getTime())) {
+          return sendResponse(res, 400, 'Invalid fee data');
+        }
+      }
+    }
+
+    const newAdmissionForm = new AdmissionForm({
+      admissionNo,
+      rollNo,
+      classId: new mongoose.Types.ObjectId(classId),
       section,
       firstName,
       lastName,
       gender,
       dob: new Date(dob),
-      route: routeId ? new mongoose.Types.ObjectId(routeId) : null,
-      pickupPoint: pickupPointId ? new mongoose.Types.ObjectId(pickupPointId) : null,
+      routeId: routeId ? new mongoose.Types.ObjectId(routeId) : null,
+      pickupPointId: pickupPointId ? new mongoose.Types.ObjectId(pickupPointId) : null,
       feesMonth,
-      fees: fees?.map(fee => ({
-        class: new mongoose.Types.ObjectId(classId),
-        feeType: fee.feeType,
-        dueDate: new Date(fee.dueDate),
-        amount: parseFloat(fee.amount),
-      })) || [],
-      parents: {
-        father: {
-          name: parents.father.name,
-          phone: parents.father.phone,
-          occupation: parents.father.occupation,
-        },
-        mother: {
-          name: parents.mother.name,
-          phone: parents.mother.phone,
-          occupation: parents.mother.occupation,
-        },
-      },
-      additionalDetails: {
-        aadharNumber: additionalDetails?.aadharNumber || '',
-        panNumber: additionalDetails?.panNumber || '',
-        tcNumber: additionalDetails?.tcNumber || '',
-      },
-      admin: new mongoose.Types.ObjectId(adminID),
+      fees,
+      parents,
+      additionalDetails,
+      school: new mongoose.Types.ObjectId(adminID),
     });
-    await newStudent.save();
-    const populatedStudent = await Student.findById(newStudent._id)
-      .populate('class', 'name')
-      .populate('route', 'title')
-      .populate('pickupPoint', 'name')
-      .lean();
-    res.status(201).json({ message: 'Student added successfully', data: populatedStudent });
+
+    await newAdmissionForm.save();
+    return sendResponse(res, 201, 'Admission form added successfully', newAdmissionForm);
   } catch (error) {
-    console.error('Error adding student:', error.message);
-    res.status(500).json({ message: 'Server error while adding student', error: error.message });
+    console.error('Error adding admission form:', error.stack);
+    return sendResponse(res, 500, 'Server error while adding admission form');
   }
 };
 
-exports.updateStudent = async (req, res) => {
+exports.updateAdmissionForm = async (req, res) => {
   try {
     const {
-      admissionNo, rollNo, classId, section, firstName, lastName, gender, dob,
-      routeId, pickupPointId, feesMonth, fees, parents, additionalDetails, adminID
-    } = req.body;
-    if (!mongoose.Types.ObjectId.isValid(adminID) || !mongoose.Types.ObjectId.isValid(classId) ||
-        (routeId && !mongoose.Types.ObjectId.isValid(routeId)) ||
-        (pickupPointId && !mongoose.Types.ObjectId.isValid(pickupPointId))) {
-      return res.status(400).json({ message: 'Invalid ID format' });
-    }
-    const student = await Student.findOne({ _id: req.params.id, admin: new mongoose.Types.ObjectId(adminID) });
-    if (!student) {
-      return res.status(404).json({ message: 'Student not found' });
-    }
-    const existingStudent = await Student.findOne({
       admissionNo,
-      admin: new mongoose.Types.ObjectId(adminID),
-      _id: { $ne: req.params.id },
-    });
-    if (existingStudent) {
-      return res.status(400).json({ message: 'Admission number already exists' });
+      rollNo,
+      classId,
+      section,
+      firstName,
+      lastName,
+      gender,
+      dob,
+      routeId,
+      pickupPointId,
+      feesMonth,
+      fees,
+      parents,
+      additionalDetails,
+      adminID,
+    } = sanitize(req.body);
+
+    if (!mongoose.Types.ObjectId.isValid(adminID) || (classId && !mongoose.Types.ObjectId.isValid(classId))) {
+      return sendResponse(res, 400, 'Invalid adminID or classId format');
     }
-    const classExists = await Fclass.findById(classId);
-    if (!classExists) {
-      return res.status(404).json({ message: 'Class not found' });
+
+    if (dob && isNaN(new Date(dob).getTime())) {
+      return sendResponse(res, 400, 'Invalid date format for DOB');
     }
-    if (!classExists.sections.includes(section)) {
-      return res.status(400).json({ message: 'Invalid section for selected class' });
-    }
-    if (routeId) {
-      const routeExists = await TransportRoute.findById(routeId);
-      if (!routeExists) {
-        return res.status(404).json({ message: 'Route not found' });
+
+    if (fees && Array.isArray(fees)) {
+      for (const fee of fees) {
+        if (!fee.feeType || !fee.dueDate || !fee.amount || isNaN(new Date(fee.dueDate).getTime())) {
+          return sendResponse(res, 400, 'Invalid fee data');
+        }
       }
     }
-    if (pickupPointId) {
-      const pointExists = await PickupPoint.findById(pickupPointId);
-      if (!pointExists) {
-        return res.status(404).json({ message: 'Pickup point not found' });
-      }
+
+    const admissionForm = await AdmissionForm.findOne({ _id: req.params.id, school: new mongoose.Types.ObjectId(adminID) });
+    if (!admissionForm) {
+      return sendResponse(res, 404, 'Admission form not found');
     }
-    student.admissionNo = admissionNo || student.admissionNo;
-    student.rollNo = rollNo || student.rollNo;
-    student.class = new mongoose.Types.ObjectId(classId);
-    student.section = section || student.section;
-    student.firstName = firstName || student.firstName;
-    student.lastName = lastName || student.lastName;
-    student.gender = gender || student.gender;
-    student.dob = dob ? new Date(dob) : student.dob;
-    student.route = routeId ? new mongoose.Types.ObjectId(routeId) : student.route;
-    student.pickupPoint = pickupPointId ? new mongoose.Types.ObjectId(pickupPointId) : student.pickupPoint;
-    student.feesMonth = feesMonth || student.feesMonth;
-    student.fees = fees?.map(fee => ({
-      class: new mongoose.Types.ObjectId(classId),
-      feeType: fee.feeType,
-      dueDate: new Date(fee.dueDate),
-      amount: parseFloat(fee.amount),
-    })) || student.fees;
-    student.parents = {
-      father: {
-        name: parents?.father?.name || student.parents.father.name,
-        phone: parents?.father?.phone || student.parents.father.phone,
-        occupation: parents?.father?.occupation || student.parents.father.occupation,
-      },
-      mother: {
-        name: parents?.mother?.name || student.parents.mother.name,
-        phone: parents?.mother?.phone || student.parents.mother.phone,
-        occupation: parents?.mother?.occupation || student.parents.mother.occupation,
-      },
-    };
-    student.additionalDetails = {
-      aadharNumber: additionalDetails?.aadharNumber || student.additionalDetails.aadharNumber,
-      panNumber: additionalDetails?.panNumber || student.additionalDetails.panNumber,
-      tcNumber: additionalDetails?.tcNumber || student.additionalDetails.tcNumber,
-    };
-    await student.save();
-    const populatedStudent = await Student.findById(student._id)
-      .populate('class', 'name')
-      .populate('route', 'title')
-      .populate('pickupPoint', 'name')
-      .lean();
-    res.status(200).json({ message: 'Student updated successfully', data: populatedStudent });
+
+    admissionForm.admissionNo = admissionNo ?? admissionForm.admissionNo;
+    admissionForm.rollNo = rollNo ?? admissionForm.rollNo;
+    admissionForm.classId = classId ? new mongoose.Types.ObjectId(classId) : admissionForm.classId;
+    admissionForm.section = section ?? admissionForm.section;
+    admissionForm.firstName = firstName ?? admissionForm.firstName;
+    admissionForm.lastName = lastName ?? admissionForm.lastName;
+    admissionForm.gender = gender ?? admissionForm.gender;
+    admissionForm.dob = dob ? new Date(dob) : admissionForm.dob;
+    admissionForm.routeId = routeId ? new mongoose.Types.ObjectId(routeId) : admissionForm.routeId;
+    admissionForm.pickupPointId = pickupPointId ? new mongoose.Types.ObjectId(pickupPointId) : admissionForm.pickupPointId;
+    admissionForm.feesMonth = feesMonth ?? admissionForm.feesMonth;
+    admissionForm.fees = fees ?? admissionForm.fees;
+    admissionForm.parents = parents ?? admissionForm.parents;
+    admissionForm.additionalDetails = additionalDetails ?? admissionForm.additionalDetails;
+
+    await admissionForm.save();
+    return sendResponse(res, 200, 'Admission form updated successfully', admissionForm);
   } catch (error) {
-    console.error('Error updating student:', error.message);
-    res.status(500).json({ message: 'Server error while updating student', error: error.message });
+    console.error('Error updating admission form:', error.stack);
+    return sendResponse(res, 500, 'Server error while updating admission form');
   }
 };
 
-exports.deleteStudent = async (req, res) => {
+exports.deleteAdmissionForm = async (req, res) => {
   try {
     const adminID = req.query.adminID;
+
     if (!mongoose.Types.ObjectId.isValid(adminID)) {
-      return res.status(400).json({ message: 'Invalid adminID format' });
+      return sendResponse(res, 400, 'Invalid adminID format');
     }
-    const student = await Student.findOneAndDelete({ _id: req.params.id, admin: new mongoose.Types.ObjectId(adminID) });
-    if (!student) {
-      return res.status(404).json({ message: 'Student not found' });
+
+    const admissionForm = await AdmissionForm.findOneAndDelete({
+      _id: req.params.id,
+      school: new mongoose.Types.ObjectId(adminID),
+    });
+
+    if (!admissionForm) {
+      return sendResponse(res, 404, 'Admission form not found');
     }
-    res.status(200).json({ message: 'Student deleted successfully' });
+
+    return sendResponse(res, 200, 'Admission form deleted successfully');
   } catch (error) {
-    console.error('Error deleting student:', error.message);
-    res.status(500).json({ message: 'Server error while deleting student', error: error.message });
+    console.error('Error deleting admission form:', error.stack);
+    return sendResponse(res, 500, 'Server error while deleting admission form');
   }
 };

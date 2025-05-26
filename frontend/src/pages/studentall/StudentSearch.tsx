@@ -1,243 +1,265 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import Select from 'react-select';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import styled from 'styled-components';
+import { searchStudents, resetSearch } from '../../redux/StudentAddmissionDetail/studentSearchHandle';
+import { getAllFclasses } from '../../redux/fclass/fclassHandle'; // Assuming this exists
+import { RootState, AppDispatch } from '../../redux/store';
 
-const StudentSearch = () => {
-  const allStudents = [
-    { id: 1, name: "Alexander Kayla", roll: 18078, class: "Class 2", section: "A" },
-    { id: 2, name: "Suresh Patel", roll: 90775, class: "Class 2", section: "A" },
-    { id: 3, name: "Anjali Sharma", roll: 56432, class: "Class 3", section: "B" },
-    { id: 4, name: "Rahul Verma", roll: 88991, class: "Class 1", section: "A" },
-  ];
+interface Option {
+  value: string;
+  label: string;
+}
 
-  const [selectedClass, setSelectedClass] = useState("Class 2");
-  const [selectedSection, setSelectedSection] = useState("A");
-  const [students, setStudents] = useState([]);
-  const [popupMessage, setPopupMessage] = useState("");
+const Container = styled.div`
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  min-height: 100vh;
+  font-family: 'Roboto', sans-serif;
+`;
+
+const Title = styled.h2`
+  text-align: center;
+  color: #2c3e50;
+  margin-bottom: 1.5rem;
+  font-size: clamp(1.8rem, 5vw, 2.2rem);
+`;
+
+const FilterSection = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+`;
+
+const Input = styled.input`
+  padding: 0.6rem;
+  border: 1px solid #bdc3c7;
+  border-radius: 6px;
+  font-size: clamp(0.85rem, 3vw, 0.95rem);
+  width: 100%;
+`;
+
+const Button = styled.button`
+  padding: 0.6rem 1.2rem;
+  background: linear-gradient(45deg, #2ecc71, #27ae60);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: clamp(0.9rem, 3vw, 1rem);
+`;
+
+const StudentSearch: React.FC = () => {
+  const dispatch = useDispatch<AppDispatch>();
+  const { students, loading, error, status } = useSelector((state: RootState) => state.studentSearch);
+  const { currentUser } = useSelector((state: RootState) => state.user);
+  const { fclassesList } = useSelector((state: RootState) => state.fclass);
+  const adminID = currentUser?._id;
+
+  const [searchParams, setSearchParams] = useState({
+    admissionNo: '',
+    name: '',
+    classId: '',
+    section: '',
+  });
+
+  useEffect(() => {
+    if (adminID) {
+      dispatch(getAllFclasses(adminID));
+    } else {
+      toast.error('Please log in to search students', { position: 'top-right', autoClose: 3000 });
+    }
+  }, [dispatch, adminID]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setSearchParams((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSelectChange = (name: string, newValue: Option | null) => {
+    setSearchParams((prev) => ({
+      ...prev,
+      [name]: newValue ? newValue.value : '',
+      ...(name === 'classId' && { section: '' }), // Reset section when class changes
+    }));
+  };
 
   const handleSearch = () => {
-    const filteredStudents = allStudents.filter(
-      (student) => student.class === selectedClass && student.section === selectedSection
-    );
-    setStudents(filteredStudents);
+    if (!adminID) {
+      toast.error('Please log in to search students', { position: 'top-right', autoClose: 3000 });
+      return;
+    }
+    dispatch(searchStudents(adminID, searchParams));
   };
 
-  const handleUpdateStudent = (id, newClass, newSection) => {
-    setStudents(
-      students.map((student) =>
-        student.id === id ? { ...student, class: newClass, section: newSection } : student
-      )
-    );
-    showPopup("✅ Student updated successfully!");
+  const handleReset = () => {
+    setSearchParams({ admissionNo: '', name: '', classId: '', section: '' });
+    dispatch(resetSearch());
   };
 
-  const handleRemoveStudent = (id) => {
-    setStudents(students.filter((student) => student.id !== id));
-    showPopup("❌ Student removed!");
-  };
-
-  const handleAddStudent = () => {
-    const newStudent = {
-      id: Date.now(),
-      name: "New Student",
-      roll: Math.floor(10000 + Math.random() * 90000),
-      class: selectedClass,
-      section: selectedSection,
-    };
-    setStudents([...students, newStudent]);
-  };
-
-  const showPopup = (message) => {
-    setPopupMessage(message);
-    setTimeout(() => setPopupMessage(""), 2000);
-  };
+  const classOptions: Option[] = fclassesList.map((cls) => ({ value: cls._id, label: cls.name }));
+  const sectionOptions: Option[] = fclassesList
+    .find((cls) => cls._id === searchParams.classId)
+    ?.sections.map((sec) => ({ value: sec, label: sec })) || [];
 
   return (
-    <div style={styles.container}>
-      <h2 style={styles.heading}>🎓 Select Student Criteria</h2>
-      <div style={styles.searchBox}>
-        <div style={styles.inputGroup}>
-          <label style={styles.label}>Class *</label>
-          <select
-            style={styles.select}
-            value={selectedClass}
-            onChange={(e) => setSelectedClass(e.target.value)}
-          >
-            <option>Class 1</option>
-            <option>Class 2</option>
-            <option>Class 3</option>
-          </select>
-        </div>
-        <div style={styles.inputGroup}>
-          <label style={styles.label}>Section *</label>
-          <select
-            style={styles.select}
-            value={selectedSection}
-            onChange={(e) => setSelectedSection(e.target.value)}
-          >
-            <option>A</option>
-            <option>B</option>
-            <option>C</option>
-          </select>
-        </div>
-        <button style={styles.searchButton} onClick={handleSearch}>🔍 Search</button>
-      </div>
+    <>
+      <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
+      <Container>
+        <ToastContainer />
+        <Title>Student Search</Title>
 
-      <h2 style={styles.heading}>📜 Selected Students</h2>
-      <div style={styles.studentList}>
-        {students.length > 0 ? (
-          students.map((student) => (
-            <StudentCard key={student.id} student={student} onUpdate={handleUpdateStudent} onRemove={handleRemoveStudent} />
-          ))
+        {error && <div style={{ color: '#e74c3c', textAlign: 'center', marginBottom: '1rem' }}>{error}</div>}
+
+        <FilterSection>
+          <div style={{ width: '200px' }}>
+            <label style={{ fontSize: 'clamp(0.9rem, 3vw, 1rem)', color: '#2c3e50', fontWeight: 500 }}>
+              Admission No
+            </label>
+            <Input
+              name="admissionNo"
+              value={searchParams.admissionNo}
+              onChange={handleInputChange}
+              placeholder="Search by Admission No"
+            />
+          </div>
+          <div style={{ width: '200px' }}>
+            <label style={{ fontSize: 'clamp(0.9rem, 3vw, 1rem)', color: '#2c3e50', fontWeight: 500 }}>
+              Name
+            </label>
+            <Input
+              name="name"
+              value={searchParams.name}
+              onChange={handleInputChange}
+              placeholder="Search by Name"
+            />
+          </div>
+          <div style={{ width: '200px' }}>
+            <label style={{ fontSize: 'clamp(0.9rem, 3vw, 1rem)', color: '#2c3e50', fontWeight: 500 }}>
+              Class
+            </label>
+            <Select
+              options={classOptions}
+              value={classOptions.find((opt) => opt.value === searchParams.classId) || null}
+              onChange={(newValue) => handleSelectChange('classId', newValue)}
+              placeholder="Select Class"
+              isClearable
+              isSearchable
+              styles={{
+                control: (base) => ({
+                  ...base,
+                  borderRadius: '6px',
+                  padding: '0.2rem',
+                  minWidth: '100%',
+                }),
+                menu: (base) => ({
+                  ...base,
+                  borderRadius: '6px',
+                  marginTop: '4px',
+                  zIndex: 1000,
+                }),
+              }}
+            />
+          </div>
+          <div style={{ width: '200px' }}>
+            <label style={{ fontSize: 'clamp(0.9rem, 3vw, 1rem)', color: '#2c3e50', fontWeight: 500 }}>
+              Section
+            </label>
+            <Select
+              options={sectionOptions}
+              value={sectionOptions.find((opt) => opt.value === searchParams.section) || null}
+              onChange={(newValue) => handleSelectChange('section', newValue)}
+              placeholder="Select Section"
+              isClearable
+              isSearchable
+              isDisabled={!searchParams.classId}
+              styles={{
+                control: (base) => ({
+                  ...base,
+                  borderRadius: '6px',
+                  padding: '0.2rem',
+                  minWidth: '100%',
+                }),
+                menu: (base) => ({
+                  ...base,
+                  borderRadius: '6px',
+                  marginTop: '4px',
+                  zIndex: 1000,
+                }),
+              }}
+            />
+          </div>
+          <Button onClick={handleSearch}>Search</Button>
+          <Button onClick={handleReset} style={{ background: 'linear-gradient(45deg, #e74c3c, #c0392b)' }}>
+            Reset
+          </Button>
+        </FilterSection>
+
+        {loading ? (
+          <div style={{ color: '#34495e', textAlign: 'center' }}>Loading...</div>
+        ) : students.length === 0 ? (
+          <div style={{ color: '#34495e', textAlign: 'center' }}>
+            No students found. Try adjusting your search criteria.
+          </div>
         ) : (
-          <p style={{ textAlign: "center", color: "#777" }}>No students found for this class & section.</p>
+          <div style={{ overflowX: 'auto', width: '100%', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)' }}>
+            <table style={{ width: '100%', background: 'white', borderRadius: '12px', borderCollapse: 'collapse', minWidth: '800px' }}>
+              <thead>
+                <tr>
+                  <th style={{ background: 'linear-gradient(45deg, #3498db, #2980b9)', color: 'white', padding: '0.8rem', fontWeight: 600 }}>
+                    Admission No
+                  </th>
+                  <th style={{ background: 'linear-gradient(45deg, #3498db, #2980b9)', color: 'white', padding: '0.8rem', fontWeight: 600 }}>
+                    Name
+                  </th>
+                  <th style={{ background: 'linear-gradient(45deg, #3498db, #2980b9)', color: 'white', padding: '0.8rem', fontWeight: 600 }}>
+                    Class
+                  </th>
+                  <th style={{ background: 'linear-gradient(45deg, #3498db, #2980b9)', color: 'white', padding: '0.8rem', fontWeight: 600 }}>
+                    Section
+                  </th>
+                  <th style={{ background: 'linear-gradient(45deg, #3498db, #2980b9)', color: 'white', padding: '0.8rem', fontWeight: 600 }}>
+                    Gender
+                  </th>
+                  <th style={{ background: 'linear-gradient(45deg, #3498db, #2980b9)', color: 'white', padding: '0.8rem', fontWeight: 600 }}>
+                    DOB
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {students.map((student) => (
+                  <tr key={student._id}>
+                    <td style={{ padding: '0.8rem', textAlign: 'center', borderBottom: '1px solid #ecf0f1' }}>
+                      {student.admissionNo}
+                    </td>
+                    <td style={{ padding: '0.8rem', textAlign: 'center', borderBottom: '1px solid #ecf0f1' }}>
+                      {student.firstName} {student.lastName}
+                    </td>
+                    <td style={{ padding: '0.8rem', textAlign: 'center', borderBottom: '1px solid #ecf0f1' }}>
+                      {typeof student.classId === 'object' && student.classId ? student.classId.name : 'Unknown'}
+                    </td>
+                    <td style={{ padding: '0.8rem', textAlign: 'center', borderBottom: '1px solid #ecf0f1' }}>
+                      {student.section}
+                    </td>
+                    <td style={{ padding: '0.8rem', textAlign: 'center', borderBottom: '1px solid #ecf0f1' }}>
+                      {student.gender || 'N/A'}
+                    </td>
+                    <td style={{ padding: '0.8rem', textAlign: 'center', borderBottom: '1px solid #ecf0f1' }}>
+                      {new Date(student.dob).toLocaleDateString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
-      </div>
-
-      <button style={styles.addButton} onClick={handleAddStudent}>➕ Add Student</button>
-
-      {popupMessage && <div style={styles.popup}>{popupMessage}</div>}
-    </div>
+      </Container>
+    </>
   );
-};
-
-const StudentCard = ({ student, onUpdate, onRemove }) => {
-  const [studentClass, setStudentClass] = useState(student.class);
-  const [studentSection, setStudentSection] = useState(student.section);
-
-  return (
-    <div style={styles.studentCard}>
-      <h3 style={styles.studentName}>
-        {student.name} <span style={styles.roll}>({student.roll})</span>
-      </h3>
-      <div style={styles.inputGroup}>
-        <label style={styles.label}>Class</label>
-        <select
-          style={styles.select}
-          value={studentClass}
-          onChange={(e) => setStudentClass(e.target.value)}
-        >
-          <option>Class 1</option>
-          <option>Class 2</option>
-          <option>Class 3</option>
-        </select>
-      </div>
-      <div style={styles.inputGroup}>
-        <label style={styles.label}>Section</label>
-        <select
-          style={styles.select}
-          value={studentSection}
-          onChange={(e) => setStudentSection(e.target.value)}
-        >
-          <option>A</option>
-          <option>B</option>
-          <option>C</option>
-        </select>
-      </div>
-      <div style={styles.buttonGroup}>
-        <button
-          style={styles.updateButton}
-          onClick={() => onUpdate(student.id, studentClass, studentSection)}
-        >
-          ✏️
-        </button>
-        <button
-          style={styles.removeButton}
-          onClick={() => onRemove(student.id)}
-        >
-          ❌
-        </button>
-      </div>
-    </div>
-  );
-};
-
-// Styles
-const styles = {
-  container: {
-    maxWidth: "900px",
-    margin: "auto",
-    padding: "20px",
-    fontFamily: "Arial, sans-serif",
-    background: "linear-gradient(135deg,rgb(240, 200, 121), #d3e0ff)",
-    borderRadius: "10px",
-    boxShadow: "0 5px 15px rgba(0, 0, 0, 0.1)",
-  },
-  heading: {
-    fontSize: "22px",
-    fontWeight: "bold",
-    textAlign: "center",
-    color: "#333",
-    marginBottom: "20px",
-  },
-  searchBox: {
-    display: "flex",
-    alignItems: "center",
-    gap: "15px",
-    background: "#fff",
-    padding: "15px",
-    borderRadius: "8px",
-    boxShadow: "0 4px 10px rgba(0, 0, 0, 0.1)",
-  },
-  inputGroup: {
-    display: "flex",
-    flexDirection: "column",
-  },
-  label: {
-    fontSize: "14px",
-    fontWeight: "bold",
-    color: "#555",
-    marginBottom: "5px",
-  },
-  select: {
-    padding: "8px",
-    borderRadius: "5px",
-    border: "1px solid #bbb",
-    fontSize: "14px",
-    backgroundColor: "#f9f9f9",
-  },
-  searchButton: {
-    padding: "10px 15px",
-    background: "#28a745",
-    color: "white",
-    border: "none",
-    borderRadius: "5px",
-    cursor: "pointer",
-    fontSize: "14px",
-  },
-  studentList: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-    gap: "15px",
-  },
-  studentCard: {
-    background: "#fff",
-    padding: "15px",
-    borderRadius: "10px",
-    boxShadow: "0 3px 6px rgba(0, 0, 0, 0.1)",
-    display: "flex",
-    flexDirection: "column",
-    gap: "10px",
-  },
-  addButton: {
-    display: "block",
-    margin: "20px auto",
-    padding: "12px 20px",
-    fontSize: "16px",
-    fontWeight: "bold",
-    color: "white",
-    background: "#007BFF",
-    border: "none",
-    borderRadius: "5px",
-    cursor: "pointer",
-  },
-  popup: {
-    position: "fixed",
-    bottom: "20px",
-    right: "20px",
-    background: "#333",
-    color: "white",
-    padding: "10px 15px",
-    borderRadius: "5px",
-  },
 };
 
 export default StudentSearch;

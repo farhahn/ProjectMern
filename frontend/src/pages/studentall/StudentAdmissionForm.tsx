@@ -1,110 +1,257 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { Box, Typography, TextField, Button, Select, MenuItem, FormControl, InputLabel, Collapse,Alert,Snackbar } from '@mui/material';
-import { FaPlus, FaMinus } from 'react-icons/fa';
+import React, { useState, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { createStudent, clearStudentError } from '../../redux/StudentAddmissionDetail/studentAddmissionHandle';
+import Select, { OnChangeValue, SelectInstance } from 'react-select';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import styled, { keyframes } from 'styled-components';
+import {
+  fetchAdmissionForms,
+  addAdmissionForm,
+  updateAdmissionForm,
+  deleteAdmissionForm,
+} from '../../redux/StudentAddmissionDetail/studentAddmissionHandle';
 import { getAllFclasses } from '../../redux/fclass/fclassHandle';
 import { getAllSections } from '../../redux/sectionRelated/sectionHandle';
 import { getAllTransportRoutes } from '../../redux/TransportRelated/routeHandle';
 import { getAllPickupPoints } from '../../redux/TransportRelated/PickupPointAction';
-import { styled } from '@mui/system';
+import { RootState, AppDispatch } from '../../redux/store';
+import { FaPlus, FaMinus } from 'react-icons/fa';
 
-const FormContainer = styled(Box)({
-  maxWidth: '600px',
-  margin: 'auto',
-  padding: '20px',
-  fontFamily: 'Arial, sans-serif',
-  boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
-  borderRadius: '8px',
-  background: '#fff',
-});
+interface Option {
+  value: string;
+  label: string;
+}
 
-const Header = styled(Box)({
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  marginBottom: '20px',
-});
+interface Fee {
+  feeType: string;
+  dueDate: string;
+  amount: string;
+}
 
-const ImportButton = styled(Button)({
-  background: '#007bff',
-  color: '#fff',
-  border: 'none',
-  padding: '10px 15px',
-  borderRadius: '5px',
-  cursor: 'pointer',
-  '&:hover': {
-    background: '#0056b3',
-  },
-});
+interface Parent {
+  name: string;
+  phone: string;
+  occupation: string;
+}
 
-const GridSection = styled(Box)({
-  display: 'grid',
-  gridTemplateColumns: 'repeat(2, 1fr)',
-  gap: '10px',
-  marginBottom: '15px',
-});
+interface AdditionalDetails {
+  aadharNumber: string;
+  panNumber: string;
+  tcNumber: string;
+}
 
-const Input = styled(TextField)({
-  '& .MuiInputBase-root': {
-    padding: '10px',
-    borderRadius: '5px',
-    border: '1px solid #ccc',
-  },
-});
+interface AdmissionForm {
+  _id: string;
+  admissionNo: string;
+  rollNo: string;
+  classId: { _id: string; name: string } | string | null;
+  section: string;
+  firstName: string;
+  lastName: string;
+  gender: string;
+  dob: string;
+  routeId: { _id: string; title: string } | string | null;
+  pickupPointId: { _id: string; name: string } | string | null;
+  feesMonth: string;
+  fees: Fee[];
+  parents: {
+    father: Parent;
+    mother: Parent;
+  };
+  additionalDetails: AdditionalDetails;
+  school: string;
+}
 
-const SelectInput = styled(Select)({
-  padding: '10px',
-  borderRadius: '5px',
-  border: '1px solid #ccc',
-});
+interface Fclass {
+  _id: string;
+  name: string;
+  sections: string[];
+}
 
-const FeeSection = styled(Box)({
-  border: '1px solid #ddd',
-  borderRadius: '5px',
-  marginBottom: '10px',
-  padding: '10px',
-  background: '#f9f9f9',
-});
+const fadeIn = keyframes`
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+`;
 
-const FeeHeader = styled(Box)({
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  cursor: 'pointer',
-});
+const scaleIn = keyframes`
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+`;
 
-const ToggleButton = styled(Button)({
-  background: 'none',
-  border: 'none',
-  fontSize: '16px',
-  cursor: 'pointer',
-  minWidth: 'auto',
-});
+const Container = styled.div`
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  min-height: 100vh;
+  font-family: 'Roboto', sans-serif;
+  overflow-x: hidden;
+  width: 100%;
+  box-sizing: border-box;
+  @media (max-width: 768px) {
+    padding: 1rem;
+  }
+`;
 
-const FeeGrid = styled(Box)({
-  marginTop: '10px',
-  display: 'grid',
-  gridTemplateColumns: 'repeat(3, 1fr)',
-  gap: '10px',
-});
+const Title = styled.h2`
+  text-align: center;
+  color: #2c3e50;
+  margin-bottom: 1.5rem;
+  font-size: clamp(1.8rem, 5vw, 2.2rem);
+  font-weight: 700;
+  text-transform: uppercase;
+`;
 
-const SaveButton = styled(Button)({
-  width: '100%',
-  padding: '10px',
-  borderRadius: '5px',
-  background: '#28a745',
-  color: '#fff',
-  border: 'none',
-  cursor: 'pointer',
-  fontSize: '16px',
-  '&:hover': {
-    background: '#218838',
-  },
-});
+const HeaderSection = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+`;
 
-const StudentAdmissionForm = () => {
-  const [formData, setFormData] = useState({
+const FilterSection = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+`;
+
+const Button = styled.button`
+  padding: 0.6rem 1.2rem;
+  background: linear-gradient(45deg, #2ecc71, #27ae60);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: clamp(0.9rem, 3vw, 1rem);
+  font-weight: 600;
+  transition: transform 0.2s, box-shadow 0.2s;
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+`;
+
+const Input = styled.input`
+  padding: 0.6rem;
+  border: 1px solid #bdc3c7;
+  border-radius: 6px;
+  font-size: clamp(0.85rem, 3vw, 0.95rem);
+  width: 100%;
+  box-sizing: border-box;
+  &:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+  }
+`;
+
+const FormContainer = styled.form`
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+`;
+
+const ModalOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 999;
+  animation: ${fadeIn} 0.3s ease;
+`;
+
+const Modal = styled.div`
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: white;
+  padding: 1.5rem;
+  width: 90%;
+  max-width: 600px;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  animation: ${scaleIn} 0.3s ease;
+  max-height: 90vh;
+  overflow-y: auto;
+`;
+
+const SectionTitle = styled.h3`
+  color: #34495e;
+  font-size: clamp(1.2rem, 4vw, 1.4rem);
+  font-weight: 500;
+  margin: 1rem 0;
+`;
+
+const GridSection = styled.div`
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  @media (max-width: 600px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const FeeSection = styled.div`
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 1rem;
+  background: #f9f9f9;
+`;
+
+const FeeGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  @media (max-width: 600px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const ActionButton = styled.button`
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  margin: 0 0.3rem;
+  transition: transform 0.2s;
+  &:hover {
+    transform: scale(1.2);
+  }
+`;
+
+const StudentAdmissionForm: React.FC = () => {
+  const dispatch = useDispatch<AppDispatch>();
+  const { admissionForms = [], loading, error: reduxError, status } = useSelector((state: RootState) => {
+    console.log('Redux state:', state);
+    return state.admissionForms;
+  });
+  const { currentUser } = useSelector((state: RootState) => state.user);
+  const { fclassesList, error: fclassError } = useSelector((state: RootState) => state.fclass);
+  const { sectionsList, error: sectionError } = useSelector((state: RootState) => state.sections);
+  const { transportRoutesList, error: routeError } = useSelector((state: RootState) => state.transportRoute);
+  const { pickupPointsList, error: pickupError } = useSelector((state: RootState) => state.pickupPoint);
+  const adminID = currentUser?._id;
+
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [feesVisible, setFeesVisible] = useState(false);
+  const [filterClass, setFilterClass] = useState<string | null>(null);
+  const [filterSection, setFilterSection] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const [formData, setFormData] = useState<AdmissionForm>({
+    _id: '',
     admissionNo: '',
     rollNo: '',
     classId: '',
@@ -126,61 +273,104 @@ const StudentAdmissionForm = () => {
       panNumber: '',
       tcNumber: '',
     },
+    school: adminID || '',
   });
-  const [feesVisible, setFeesVisible] = useState(false);
-  const [snack, setSnack] = useState({ open: false, message: '', severity: 'success' });
-  const inputRefs = useRef([]);
 
-  const dispatch = useDispatch();
-  const fclassState = useSelector((state) => state.fclass || { fclassesList: [], loading: false, error: null });
-  const sectionState = useSelector((state) => state.sections || { sectionsList: [], error: null });
-  const transportRouteState = useSelector((state) => state.transportRoute || { transportRoutesList: [], error: null });
-  const pickupPointState = useSelector((state) => state.pickupPoint || { pickupPointsList: [], error: null });
-  const studentState = useSelector((state) => state.student || { error: null });
-  const userState = useSelector((state) => state.user || {});
-  const { fclassesList } = fclassState;
-  const { sectionsList } = sectionState;
-  const { transportRoutesList } = transportRouteState;
-  const { pickupPointsList } = pickupPointState;
-  const { error: studentError } = studentState;
-  const adminID = userState.currentUser?._id;
+  const inputRefs = {
+    admissionNo: useRef<HTMLInputElement>(null),
+    rollNo: useRef<HTMLInputElement>(null),
+    classId: useRef<SelectInstance<Option>>(null),
+    section: useRef<SelectInstance<Option>>(null),
+    firstName: useRef<HTMLInputElement>(null),
+    lastName: useRef<HTMLInputElement>(null),
+    gender: useRef<SelectInstance<Option>>(null),
+    dob: useRef<HTMLInputElement>(null),
+    routeId: useRef<SelectInstance<Option>>(null),
+    pickupPointId: useRef<SelectInstance<Option>>(null),
+    feesMonth: useRef<HTMLInputElement>(null),
+  };
+
+  const fieldOrder: (keyof typeof inputRefs)[] = [
+    'admissionNo',
+    'rollNo',
+    'classId',
+    'section',
+    'firstName',
+    'lastName',
+    'gender',
+    'dob',
+    'routeId',
+    'pickupPointId',
+    'feesMonth',
+  ];
 
   useEffect(() => {
-    if (adminID) {
+    let isMounted = true;
+    if (adminID && isMounted) {
+      dispatch(fetchAdmissionForms(adminID));
       dispatch(getAllFclasses(adminID));
       dispatch(getAllSections(adminID));
       dispatch(getAllTransportRoutes(adminID));
       dispatch(getAllPickupPoints(adminID));
-    } else {
-      setSnack({ open: true, message: 'Please log in to access the form', severity: 'error' });
+    } else if (!adminID) {
+      setError('Please log in to view admission forms');
+      toast.error('Please log in to view admission forms', { position: 'top-right', autoClose: 3000 });
     }
+    return () => {
+      isMounted = false;
+    };
   }, [dispatch, adminID]);
 
   useEffect(() => {
-    if (studentError) {
-      setSnack({ open: true, message: studentError, severity: 'error' });
-      dispatch(clearStudentError());
-    }
-  }, [studentError, dispatch]);
+    console.log('admissionForms:', JSON.stringify(admissionForms, null, 2));
+    console.log('status:', status);
+    console.log('reduxError:', reduxError);
+    console.log('fclassesList:', fclassesList);
 
-  const handleInputChange = (e, section, subSection) => {
+    if (fclassError) {
+      toast.error(`Failed to load classes: ${fclassError}`, { position: 'top-right', autoClose: 3000 });
+      setError(fclassError);
+    }
+    if (sectionError) {
+      toast.error(`Failed to load sections: ${sectionError}`, { position: 'top-right', autoClose: 3000 });
+      setError(sectionError);
+    }
+    if (routeError) {
+      toast.error(`Failed to load routes: ${routeError}`, { position: 'top-right', autoClose: 3000 });
+      setError(routeError);
+    }
+    if (pickupError) {
+      toast.error(`Failed to load pickup points: ${pickupError}`, { position: 'top-right', autoClose: 3000 });
+      setError(pickupError);
+    }
+    if (reduxError) {
+      toast.error(`Failed to load admission forms: ${reduxError}`, { position: 'top-right', autoClose: 3000 });
+      setError(reduxError);
+    }
+  }, [fclassError, sectionError, routeError, pickupError, reduxError, admissionForms, status, fclassesList]);
+
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    section?: keyof AdmissionForm,
+    subSection?: keyof AdmissionForm['parents']
+  ) => {
     const { name, value } = e.target;
-    if (subSection) {
+    if (subSection && section === 'parents') {
       setFormData((prev) => ({
         ...prev,
-        [section]: {
-          ...prev[section],
+        parents: {
+          ...prev.parents,
           [subSection]: {
-            ...prev[section][subSection],
+            ...prev.parents[subSection],
             [name]: value,
           },
         },
       }));
-    } else if (section) {
+    } else if (section === 'additionalDetails') {
       setFormData((prev) => ({
         ...prev,
-        [section]: {
-          ...prev[section],
+        additionalDetails: {
+          ...prev.additionalDetails,
           [name]: value,
         },
       }));
@@ -192,7 +382,66 @@ const StudentAdmissionForm = () => {
     }
   };
 
-  const handleFeeChange = (index, field, value) => {
+  const handleKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement | HTMLSelectElement>,
+    currentField: keyof typeof inputRefs
+  ) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const currentIndex = fieldOrder.indexOf(currentField);
+      const nextField = fieldOrder[currentIndex + 1];
+      if (nextField && inputRefs[nextField].current) {
+        inputRefs[nextField].current?.focus();
+        if (inputRefs[nextField].current instanceof HTMLElement) {
+          inputRefs[nextField].current?.select?.();
+        } else {
+          (inputRefs[nextField].current as SelectInstance<Option>)?.focus();
+        }
+      }
+    }
+  };
+
+  const handleSelectChange = (
+    fieldName: keyof AdmissionForm,
+    newValue: OnChangeValue<Option, false>,
+    currentField: keyof typeof inputRefs
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      [fieldName]: newValue ? newValue.value : '',
+    }));
+    const currentIndex = fieldOrder.indexOf(currentField);
+    const nextField = fieldOrder[currentIndex + 1];
+    if (nextField && inputRefs[nextField].current) {
+      setTimeout(() => {
+        inputRefs[nextField].current?.focus();
+        if (inputRefs[nextField].current instanceof HTMLElement) {
+          inputRefs[nextField].current?.select?.();
+        } else {
+          (inputRefs[nextField].current as SelectInstance<Option>)?.focus();
+        }
+      }, 0);
+    }
+  };
+
+  const handleFilterClassChange = (newValue: OnChangeValue<Option, false>) => {
+    setFilterClass(newValue ? newValue.value : null);
+    setFilterSection(null); // Reset section when class changes
+  };
+
+  const handleFilterSectionChange = (newValue: OnChangeValue<Option, false>) => {
+    setFilterSection(newValue ? newValue.value : null);
+  };
+
+  const handleSearchButtonClick = () => {
+    // Filtering is applied in filteredAdmissionForms
+  };
+
+  const handleSearchQueryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+  };
+
+  const handleFeeChange = (index: number, field: keyof Fee, value: string) => {
     setFormData((prev) => {
       const newFees = [...prev.fees];
       newFees[index] = { ...newFees[index], [field]: value };
@@ -207,342 +456,859 @@ const StudentAdmissionForm = () => {
     }));
   };
 
-  const removeFee = (index) => {
+  const removeFee = (index: number) => {
     setFormData((prev) => ({
       ...prev,
       fees: prev.fees.filter((_, i) => i !== index),
     }));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
     if (!adminID) {
-      setSnack({ open: true, message: 'Please log in to submit the form', severity: 'error' });
+      setError('Please log in to submit admission forms');
+      toast.error('Please log in to submit admission forms', { position: 'top-right', autoClose: 3000 });
       return;
     }
-    if (!formData.admissionNo || !formData.rollNo || !formData.classId || !formData.section || !formData.firstName || !formData.lastName || !formData.gender || !formData.dob || !formData.parents.father.name || !formData.parents.mother.name) {
-      setSnack({ open: true, message: 'Required fields are missing', severity: 'warning' });
+
+    if (!formData.classId || !formData.section || !formData.firstName || !formData.dob) {
+      setError('Class, Section, First Name, and DOB are required');
+      toast.error('Class, Section, First Name, and DOB are required', { position: 'top-right', autoClose: 3000 });
       return;
     }
-    const selectedClass = fclassesList.find((cls) => cls._id === formData.classId);
-    if (!selectedClass?.sections.includes(formData.section)) {
-      setSnack({ open: true, message: 'Invalid section for selected class', severity: 'warning' });
+
+    const selectedClass = fclassesList.find((cls) => cls._id === (typeof formData.classId === 'string' ? formData.classId : formData.classId?._id));
+    if (selectedClass && !selectedClass.sections.includes(formData.section)) {
+      setError('Invalid section for selected class');
+      toast.error('Invalid section for selected class', { position: 'top-right', autoClose: 3000 });
       return;
     }
-    // Filter out incomplete fees
-    const validFees = formData.fees.filter(fee => fee.feeType && fee.dueDate && fee.amount);
-    dispatch(createStudent({ ...formData, fees: validFees, classId: formData.classId }, adminID))
-      .then(() => {
-        setSnack({ open: true, message: 'Student added successfully', severity: 'success' });
-        setFormData({
-          admissionNo: '',
-          rollNo: '',
-          classId: '',
-          section: '',
-          firstName: '',
-          lastName: '',
-          gender: '',
-          dob: '',
-          routeId: '',
-          pickupPointId: '',
-          feesMonth: '',
-          fees: [{ feeType: '', dueDate: '', amount: '' }],
-          parents: {
-            father: { name: '', phone: '', occupation: '' },
-            mother: { name: '', phone: '', occupation: '' },
-          },
-          additionalDetails: {
-            aadharNumber: '',
-            panNumber: '',
-            tcNumber: '',
-          },
-        });
-        setFeesVisible(false);
-      })
-      .catch((err) => {
-        setSnack({ open: true, message: err.message || 'Failed to add student', severity: 'error' });
-      });
+
+    const validFees = formData.fees.filter((fee) => fee.feeType && fee.dueDate && fee.amount);
+    const admissionFormData = {
+      ...formData,
+      fees: validFees,
+      school: adminID,
+      classId: typeof formData.classId === 'string' ? formData.classId : formData.classId?._id,
+      routeId: typeof formData.routeId === 'string' ? formData.routeId : formData.routeId?._id,
+      pickupPointId: typeof formData.pickupPointId === 'string' ? formData.pickupPointId : formData.pickupPointId?._id,
+    };
+
+    if (editingId !== null) {
+      dispatch(updateAdmissionForm(editingId, admissionFormData, adminID));
+      toast.success('Admission form updated successfully!', { position: 'top-right', autoClose: 3000 });
+    } else {
+      dispatch(addAdmissionForm(admissionFormData, adminID));
+      toast.success('Admission form added successfully!', { position: 'top-right', autoClose: 3000 });
+    }
+
+    setFormData({
+      _id: '',
+      admissionNo: '',
+      rollNo: '',
+      classId: '',
+      section: '',
+      firstName: '',
+      lastName: '',
+      gender: '',
+      dob: '',
+      routeId: '',
+      pickupPointId: '',
+      feesMonth: '',
+      fees: [{ feeType: '', dueDate: '', amount: '' }],
+      parents: {
+        father: { name: '', phone: '', occupation: '' },
+        mother: { name: '', phone: '', occupation: '' },
+      },
+      additionalDetails: {
+        aadharNumber: '',
+        panNumber: '',
+        tcNumber: '',
+      },
+      school: adminID || '',
+    });
+    setShowForm(false);
+    setEditingId(null);
+    setFeesVisible(false);
+    setError(null);
   };
 
-  const handleKeyDown = (e, index) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      const nextIndex = index + 1;
-      if (nextIndex < inputRefs.current.length) {
-        inputRefs.current[nextIndex]?.focus();
-      } else {
-        handleSubmit();
-      }
+  const handleEdit = (id: string) => {
+    const admissionForm = admissionForms.find((s: AdmissionForm) => s._id === id);
+    if (admissionForm) {
+      setFormData(admissionForm);
+      setEditingId(id);
+      setShowForm(true);
     }
   };
 
-  const selectedClass = fclassesList.find((cls) => cls._id === formData.classId);
+  const handleDelete = (id: string) => {
+    dispatch(deleteAdmissionForm(id, adminID));
+    toast.success('Admission form deleted successfully!', { position: 'top-right', autoClose: 3000 });
+  };
+
+  const classOptions: Option[] = fclassesList.map((cls) => ({ value: cls._id, label: cls.name }));
+  const sectionOptions: Option[] = fclassesList
+    .find((cls) => cls._id === filterClass)
+    ?.sections.map((sec) => ({ value: sec, label: sec })) || [];
+  const formSectionOptions: Option[] = fclassesList
+    .find((cls) => cls._id === (typeof formData.classId === 'string' ? formData.classId : formData.classId?._id))
+    ?.sections.map((sec) => ({ value: sec, label: sec })) || [];
+  const genderOptions: Option[] = [
+    { value: 'Male', label: 'Male' },
+    { value: 'Female', label: 'Female' },
+  ];
+  const routeOptions: Option[] = transportRoutesList.map((route) => ({ value: route._id, label: route.title }));
+  const pickupPointOptions: Option[] = pickupPointsList.map((point) => ({ value: point._id, label: point.name }));
+
+  const filteredAdmissionForms = admissionForms.filter((form: AdmissionForm) => {
+    let matchesClass = true;
+    let matchesSection = true;
+    let matchesSearch = true;
+
+    if (filterClass) {
+      const classId = typeof form.classId === 'string' ? form.classId : form.classId?._id;
+      matchesClass = classId === filterClass;
+    }
+
+    if (filterSection) {
+      matchesSection = form.section === filterSection;
+    }
+
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      const fullName = `${form.firstName} ${form.lastName}`.toLowerCase();
+      matchesSearch =
+        form.admissionNo.toLowerCase().includes(query) ||
+        form.rollNo.toLowerCase().includes(query) ||
+        fullName.includes(query);
+    }
+
+    return matchesClass && matchesSection && matchesSearch;
+  });
 
   return (
-    <FormContainer>
-      <Header>
-        <Typography variant="h5" sx={{ margin: 0 }}>
-          🎓 Student Admission
-        </Typography>
-        <ImportButton>📂 Import Student</ImportButton>
-      </Header>
+    <>
+      <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
+      <Container>
+        <ToastContainer
+          position="top-right"
+          autoClose={3000}
+          toastStyle={{
+            borderRadius: '8px',
+            fontFamily: 'Roboto, sans-serif',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+          }}
+        />
+        <Title>Admission Form Management</Title>
 
-      <GridSection>
-        <Input
-          name="admissionNo"
-          value={formData.admissionNo}
-          onChange={handleInputChange}
-          placeholder="Admission No"
-          inputRef={(el) => (inputRefs.current[0] = el)}
-          onKeyDown={(e) => handleKeyDown(e, 0)}
-        />
-        <Input
-          name="rollNo"
-          value={formData.rollNo}
-          onChange={handleInputChange}
-          placeholder="Roll No"
-          inputRef={(el) => (inputRefs.current[1] = el)}
-          onKeyDown={(e) => handleKeyDown(e, 1)}
-        />
-        <FormControl>
-          <InputLabel>Class</InputLabel>
-          <SelectInput
-            name="classId"
-            value={formData.classId}
-            onChange={(e) => handleInputChange(e)}
-            inputRef={(el) => (inputRefs.current[2] = el)}
-            onKeyDown={(e) => handleKeyDown(e, 2)}
-          >
-            <MenuItem value=""><em>Select</em></MenuItem>
-            {fclassesList.map((cls) => (
-              <MenuItem key={cls._id} value={cls._id}>{cls.name}</MenuItem>
-            ))}
-          </SelectInput>
-        </FormControl>
-        <FormControl>
-          <InputLabel>Section</InputLabel>
-          <SelectInput
-            name="section"
-            value={formData.section}
-            onChange={(e) => handleInputChange(e)}
-            inputRef={(el) => (inputRefs.current[3] = el)}
-            onKeyDown={(e) => handleKeyDown(e, 3)}
-            disabled={!formData.classId}
-          >
-            <MenuItem value=""><em>Select</em></MenuItem>
-            {selectedClass?.sections.map((sec) => (
-              <MenuItem key={sec} value={sec}>{sec}</MenuItem>
-            ))}
-          </SelectInput>
-        </FormControl>
-      </GridSection>
+        {error && <div style={{ color: '#e74c3c', textAlign: 'center', marginBottom: '1rem' }}>{error}</div>}
+        {reduxError && <div style={{ color: '#e74c3c', textAlign: 'center', marginBottom: '1rem' }}>{reduxError}</div>}
 
-      <GridSection>
-        <Input
-          name="firstName"
-          value={formData.firstName}
-          onChange={handleInputChange}
-          placeholder="First Name"
-          inputRef={(el) => (inputRefs.current[4] = el)}
-          onKeyDown={(e) => handleKeyDown(e, 4)}
-        />
-        <Input
-          name="lastName"
-          value={formData.lastName}
-          onChange={handleInputChange}
-          placeholder="Last Name"
-          inputRef={(el) => (inputRefs.current[5] = el)}
-          onKeyDown={(e) => handleKeyDown(e, 5)}
-        />
-        <FormControl>
-          <InputLabel>Gender</InputLabel>
-          <SelectInput
-            name="gender"
-            value={formData.gender}
-            onChange={(e) => handleInputChange(e)}
-            inputRef={(el) => (inputRefs.current[6] = el)}
-            onKeyDown={(e) => handleKeyDown(e, 6)}
+        <HeaderSection>
+          <h3 style={{ color: '#34495e', fontSize: 'clamp(1.4rem, 4vw, 1.6rem)', fontWeight: 500 }}>
+            Admission Form Details
+          </h3>
+          <Button
+            onClick={() => {
+              setShowForm(true);
+              setEditingId(null);
+              setFormData({
+                _id: '',
+                admissionNo: '',
+                rollNo: '',
+                classId: '',
+                section: '',
+                firstName: '',
+                lastName: '',
+                gender: '',
+                dob: '',
+                routeId: '',
+                pickupPointId: '',
+                feesMonth: '',
+                fees: [{ feeType: '', dueDate: '', amount: '' }],
+                parents: {
+                  father: { name: '', phone: '', occupation: '' },
+                  mother: { name: '', phone: '', occupation: '' },
+                },
+                additionalDetails: {
+                  aadharNumber: '',
+                  panNumber: '',
+                  tcNumber: '',
+                },
+                school: adminID || '',
+              });
+            }}
           >
-            <MenuItem value="Male">Male</MenuItem>
-            <MenuItem value="Female">Female</MenuItem>
-          </SelectInput>
-        </FormControl>
-        <Input
-          name="dob"
-          type="date"
-          value={formData.dob}
-          onChange={handleInputChange}
-          placeholder="DOB"
-          inputRef={(el) => (inputRefs.current[7] = el)}
-          onKeyDown={(e) => handleKeyDown(e, 7)}
-        />
-      </GridSection>
+            + Add Admission Form
+          </Button>
+        </HeaderSection>
 
-      <GridSection>
-        <FormControl>
-          <InputLabel>Route List</InputLabel>
-          <SelectInput
-            name="routeId"
-            value={formData.routeId}
-            onChange={(e) => handleInputChange(e)}
-            inputRef={(el) => (inputRefs.current[8] = el)}
-            onKeyDown={(e) => handleKeyDown(e, 8)}
-          >
-            <MenuItem value=""><em>Select</em></MenuItem>
-            {transportRoutesList.map((route) => (
-              <MenuItem key={route._id} value={route._id}>{route.title}</MenuItem>
-            ))}
-          </SelectInput>
-        </FormControl>
-        <FormControl>
-          <InputLabel>Pickup Point</InputLabel>
-          <SelectInput
-            name="pickupPointId"
-            value={formData.pickupPointId}
-            onChange={(e) => handleInputChange(e)}
-            inputRef={(el) => (inputRefs.current[9] = el)}
-            onKeyDown={(e) => handleKeyDown(e, 9)}
-            disabled={!formData.routeId}
-          >
-            <MenuItem value=""><em>Select</em></MenuItem>
-            {pickupPointsList.map((point) => (
-              <MenuItem key={point._id} value={point._id}>{point.name}</MenuItem>
-            ))}
-          </SelectInput>
-        </FormControl>
-        <Input
-          name="feesMonth"
-          value={formData.feesMonth}
-          onChange={handleInputChange}
-          placeholder="Fees Month"
-          inputRef={(el) => (inputRefs.current[10] = el)}
-          onKeyDown={(e) => handleKeyDown(e, 10)}
-        />
-      </GridSection>
+        <FilterSection>
+          <div style={{ width: '200px' }}>
+            <label style={{ fontSize: 'clamp(0.9rem, 3vw, 1rem)', color: '#2c3e50', fontWeight: 500 }}>
+              Filter by Class
+            </label>
+            <Select
+              options={classOptions}
+              value={classOptions.find((opt) => opt.value === filterClass) || null}
+              onChange={handleFilterClassChange}
+              placeholder="Select Class"
+              isClearable
+              isSearchable
+              styles={{
+                control: (base) => ({
+                  ...base,
+                  borderRadius: '6px',
+                  padding: '0.2rem',
+                  minWidth: '100%',
+                }),
+                menu: (base) => ({
+                  ...base,
+                  borderRadius: '6px',
+                  marginTop: '4px',
+                  zIndex: 1000,
+                }),
+              }}
+            />
+          </div>
+          <div style={{ width: '200px' }}>
+            <label style={{ fontSize: 'clamp(0.9rem, 3vw, 1rem)', color: '#2c3e50', fontWeight: 500 }}>
+              Filter by Section
+            </label>
+            <Select
+              options={sectionOptions}
+              value={sectionOptions.find((opt) => opt.value === filterSection) || null}
+              onChange={handleFilterSectionChange}
+              placeholder="Select Section"
+              isClearable
+              isSearchable
+              isDisabled={!filterClass}
+              styles={{
+                control: (base) => ({
+                  ...base,
+                  borderRadius: '6px',
+                  padding: '0.2rem',
+                  minWidth: '100%',
+                }),
+                menu: (base) => ({
+                  ...base,
+                  borderRadius: '6px',
+                  marginTop: '4px',
+                  zIndex: 1000,
+                }),
+              }}
+            />
+          </div>
+          <Button onClick={handleSearchButtonClick}>Search</Button>
+          <div style={{ width: '200px' }}>
+            <label style={{ fontSize: 'clamp(0.9rem, 3vw, 1rem)', color: '#2c3e50', fontWeight: 500 }}>
+              Search by ID, Roll No, Name
+            </label>
+            <Input
+              value={searchQuery}
+              onChange={handleSearchQueryChange}
+              placeholder="Search by ID, Roll No, Name"
+            />
+          </div>
+        </FilterSection>
 
-      <Typography variant="h6" sx={{ mb: 2 }}>
-        💰 Fees Details
-      </Typography>
-      {formData.classId && (
-        <FeeSection>
-          <FeeHeader onClick={() => setFeesVisible(!feesVisible)}>
-            <Typography>{selectedClass?.name} Fees</Typography>
-            <ToggleButton>
-              {feesVisible ? <FaMinus /> : <FaPlus />}
-            </ToggleButton>
-          </FeeHeader>
-          <Collapse in={feesVisible}>
-            {formData.fees.map((fee, index) => (
-              <FeeGrid key={index}>
-                <Input
-                  placeholder="Fee Type"
-                  value={fee.feeType}
-                  onChange={(e) => handleFeeChange(index, 'feeType', e.target.value)}
-                  inputRef={(el) => (inputRefs.current[11 + index * 3] = el)}
-                  onKeyDown={(e) => handleKeyDown(e, 11 + index * 3)}
-                />
-                <Input
-                  type="date"
-                  placeholder="Due Date"
-                  value={fee.dueDate}
-                  onChange={(e) => handleFeeChange(index, 'dueDate', e.target.value)}
-                  inputRef={(el) => (inputRefs.current[12 + index * 3] = el)}
-                  onKeyDown={(e) => handleKeyDown(e, 12 + index * 3)}
-                />
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  <Input
-                    type="number"
-                    placeholder="Amount"
-                    value={fee.amount}
-                    onChange={(e) => handleFeeChange(index, 'amount', e.target.value)}
-                    inputRef={(el) => (inputRefs.current[13 + index * 3] = el)}
-                    onKeyDown={(e) => handleKeyDown(e, 13 + index * 3)}
-                  />
-                  {index > 0 && (
-                    <Button color="error" onClick={() => removeFee(index)}>Remove</Button>
+        {loading ? (
+          <div style={{ color: '#34495e', textAlign: 'center' }}>Loading...</div>
+        ) : filteredAdmissionForms.length === 0 ? (
+          <div style={{ color: '#34495e', textAlign: 'center' }}>
+            No admission forms available. {reduxError ? `Error: ${reduxError}` : 'Try adding a new form or adjusting filters.'}
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto', width: '100%', borderRadius: '12px', boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)' }}>
+            <table style={{ width: '100%', background: 'white', borderRadius: '12px', borderCollapse: 'collapse', minWidth: '800px' }}>
+              <thead>
+                <tr>
+                  <th style={{ background: 'linear-gradient(45deg, #3498db, #2980b9)', color: 'white', padding: '0.8rem', fontWeight: 600 }}>
+                    Admission No
+                  </th>
+                  <th style={{ background: 'linear-gradient(45deg, #3498db, #2980b9)', color: 'white', padding: '0.8rem', fontWeight: 600 }}>
+                    Name
+                  </th>
+                  <th style={{ background: 'linear-gradient(45deg, #3498db, #2980b9)', color: 'white', padding: '0.8rem', fontWeight: 600 }}>
+                    Class
+                  </th>
+                  <th style={{ background: 'linear-gradient(45deg, #3498db, #2980b9)', color: 'white', padding: '0.8rem', fontWeight: 600 }}>
+                    Section
+                  </th>
+                  <th style={{ background: 'linear-gradient(45deg, #3498db, #2980b9)', color: 'white', padding: '0.8rem', fontWeight: 600 }}>
+                    Action
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredAdmissionForms.map((form: AdmissionForm) => (
+                  <tr key={form._id}>
+                    <td style={{ padding: '0.8rem', textAlign: 'center', borderBottom: '1px solid #ecf0f1' }}>{form.admissionNo}</td>
+                    <td style={{ padding: '0.8rem', textAlign: 'center', borderBottom: '1px solid #ecf0f1' }}>
+                      {form.firstName} {form.lastName}
+                    </td>
+                    <td style={{ padding: '0.8rem', textAlign: 'center', borderBottom: '1px solid #ecf0f1' }}>
+                      {typeof form.classId === 'object' && form.classId ? form.classId.name : 
+                       typeof form.classId === 'string' ? fclassesList.find((cls) => cls._id === form.classId)?.name || 'Unknown' : 
+                       'Unknown'}
+                    </td>
+                    <td style={{ padding: '0.8rem', textAlign: 'center', borderBottom: '1px solid #ecf0f1' }}>{form.section}</td>
+                    <td style={{ padding: '0.8rem', textAlign: 'center', borderBottom: '1px solid #ecf0f1' }}>
+                      <ActionButton onClick={() => handleEdit(form._id)} style={{ color: '#3498db' }}>
+                        📝
+                      </ActionButton>
+                      <ActionButton onClick={() => handleDelete(form._id)} style={{ color: '#e74c3c' }}>
+                        ❌
+                      </ActionButton>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {showForm && (
+          <>
+            <ModalOverlay onClick={() => setShowForm(false)} />
+            <Modal>
+              <h3>{editingId !== null ? 'Edit Admission Form' : 'Add Admission Form'}</h3>
+              <FormContainer onSubmit={handleSubmit}>
+                <GridSection>
+                  <div>
+                    <label style={{ fontSize: 'clamp(0.9rem, 3vw, 1rem)', color: '#2c3e50', fontWeight: 500 }}>
+                      Admission No
+                    </label>
+                    <Input
+                      name="admissionNo"
+                      value={formData.admissionNo}
+                      onChange={handleInputChange}
+                      onKeyDown={(e) => handleKeyDown(e, 'admissionNo')}
+                      ref={inputRefs.admissionNo}
+                      placeholder="Admission No"
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 'clamp(0.9rem, 3vw, 1rem)', color: '#2c3e50', fontWeight: 500 }}>
+                      Roll No
+                    </label>
+                    <Input
+                      name="rollNo"
+                      value={formData.rollNo}
+                      onChange={handleInputChange}
+                      onKeyDown={(e) => handleKeyDown(e, 'rollNo')}
+                      ref={inputRefs.rollNo}
+                      placeholder="Roll No"
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 'clamp(0.9rem, 3vw, 1rem)', color: '#2c3e50', fontWeight: 500 }}>
+                      Class
+                    </label>
+                    <Select
+                      ref={inputRefs.classId}
+                      options={classOptions}
+                      value={classOptions.find((opt) => opt.value === (typeof formData.classId === 'string' ? formData.classId : formData.classId?._id)) || null}
+                      onChange={(newValue) => handleSelectChange('classId', newValue, 'classId')}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const currentValue = inputRefs.classId.current?.props.value;
+                          if (currentValue) {
+                            handleSelectChange('classId', currentValue, 'classId');
+                          } else {
+                            const inputValue = (e.target as any).value || '';
+                            const filteredOptions = classOptions.filter((opt) =>
+                              opt.label.toLowerCase().includes(inputValue.toLowerCase())
+                            );
+                            if (filteredOptions.length > 0) {
+                              handleSelectChange('classId', filteredOptions[0], 'classId');
+                            } else {
+                              const currentIndex = fieldOrder.indexOf('classId');
+                              const nextField = fieldOrder[currentIndex + 1];
+                              if (nextField && inputRefs[nextField].current) {
+                                inputRefs[nextField].current?.focus();
+                                if (inputRefs[nextField].current instanceof HTMLElement) {
+                                  inputRefs[nextField].current?.select?.();
+                                } else {
+                                  (inputRefs[nextField].current as SelectInstance<Option>)?.focus();
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }}
+                      placeholder="Select Class (e.g., type '1' for Class 1)"
+                      isClearable
+                      isSearchable
+                      filterOption={(option, inputValue) =>
+                        option.label.toLowerCase().includes(inputValue.toLowerCase())
+                      }
+                      styles={{
+                        control: (base) => ({
+                          ...base,
+                          borderRadius: '6px',
+                          padding: '0.2rem',
+                          minWidth: '100%',
+                        }),
+                        menu: (base) => ({
+                          ...base,
+                          borderRadius: '6px',
+                          marginTop: '4px',
+                          zIndex: 1000,
+                        }),
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 'clamp(0.9rem, 3vw, 1rem)', color: '#2c3e50', fontWeight: 500 }}>
+                      Section
+                    </label>
+                    <Select
+                      ref={inputRefs.section}
+                      options={formSectionOptions}
+                      value={formSectionOptions.find((opt) => opt.value === formData.section) || null}
+                      onChange={(newValue) => handleSelectChange('section', newValue, 'section')}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const currentValue = inputRefs.section.current?.props.value;
+                          if (currentValue) {
+                            handleSelectChange('section', currentValue, 'section');
+                          } else {
+                            const inputValue = (e.target as any).value || '';
+                            const filteredOptions = formSectionOptions.filter((opt) =>
+                              opt.label.toLowerCase().includes(inputValue.toLowerCase())
+                            );
+                            if (filteredOptions.length > 0) {
+                              handleSelectChange('section', filteredOptions[0], 'section');
+                            } else {
+                              const currentIndex = fieldOrder.indexOf('section');
+                              const nextField = fieldOrder[currentIndex + 1];
+                              if (nextField && inputRefs[nextField].current) {
+                                inputRefs[nextField].current?.focus();
+                                if (inputRefs[nextField].current instanceof HTMLElement) {
+                                  inputRefs[nextField].current?.select?.();
+                                } else {
+                                  (inputRefs[nextField].current as SelectInstance<Option>)?.focus();
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }}
+                      placeholder="Select Section (e.g., type 'A' for Section A)"
+                      isClearable
+                      isSearchable
+                      isDisabled={!formData.classId}
+                      filterOption={(option, inputValue) =>
+                        option.label.toLowerCase().includes(inputValue.toLowerCase())
+                      }
+                      styles={{
+                        control: (base) => ({
+                          ...base,
+                          borderRadius: '6px',
+                          padding: '0.2rem',
+                          minWidth: '100%',
+                        }),
+                        menu: (base) => ({
+                          ...base,
+                          borderRadius: '6px',
+                          marginTop: '4px',
+                          zIndex: 1000,
+                        }),
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 'clamp(0.9rem, 3vw, 1rem)', color: '#2c3e50', fontWeight: 500 }}>
+                      First Name
+                    </label>
+                    <Input
+                      name="firstName"
+                      value={formData.firstName}
+                      onChange={handleInputChange}
+                      onKeyDown={(e) => handleKeyDown(e, 'firstName')}
+                      ref={inputRefs.firstName}
+                      placeholder="First Name"
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 'clamp(0.9rem, 3vw, 1rem)', color: '#2c3e50', fontWeight: 500 }}>
+                      Last Name
+                    </label>
+                    <Input
+                      name="lastName"
+                      value={formData.lastName}
+                      onChange={handleInputChange}
+                      onKeyDown={(e) => handleKeyDown(e, 'lastName')}
+                      ref={inputRefs.lastName}
+                      placeholder="Last Name"
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 'clamp(0.9rem, 3vw, 1rem)', color: '#2c3e50', fontWeight: 500 }}>
+                      Gender
+                    </label>
+                    <Select
+                      ref={inputRefs.gender}
+                      options={genderOptions}
+                      value={genderOptions.find((opt) => opt.value === formData.gender) || null}
+                      onChange={(newValue) => handleSelectChange('gender', newValue, 'gender')}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const currentValue = inputRefs.gender.current?.props.value;
+                          if (currentValue) {
+                            handleSelectChange('gender', currentValue, 'gender');
+                          } else {
+                            const inputValue = (e.target as any).value || '';
+                            const filteredOptions = genderOptions.filter((opt) =>
+                              opt.label.toLowerCase().includes(inputValue.toLowerCase())
+                            );
+                            if (filteredOptions.length > 0) {
+                              handleSelectChange('gender', filteredOptions[0], 'gender');
+                            } else {
+                              const currentIndex = fieldOrder.indexOf('gender');
+                              const nextField = fieldOrder[currentIndex + 1];
+                              if (nextField && inputRefs[nextField].current) {
+                                inputRefs[nextField].current?.focus();
+                                if (inputRefs[nextField].current instanceof HTMLElement) {
+                                  inputRefs[nextField].current?.select?.();
+                                } else {
+                                  (inputRefs[nextField].current as SelectInstance<Option>)?.focus();
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }}
+                      placeholder="Select Gender"
+                      isClearable
+                      isSearchable
+                      filterOption={(option, inputValue) =>
+                        option.label.toLowerCase().includes(inputValue.toLowerCase())
+                      }
+                      styles={{
+                        control: (base) => ({
+                          ...base,
+                          borderRadius: '6px',
+                          padding: '0.2rem',
+                          minWidth: '100%',
+                        }),
+                        menu: (base) => ({
+                          ...base,
+                          borderRadius: '6px',
+                          marginTop: '4px',
+                          zIndex: 1000,
+                        }),
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 'clamp(0.9rem, 3vw, 1rem)', color: '#2c3e50', fontWeight: 500 }}>
+                      DOB
+                    </label>
+                    <Input
+                      type="date"
+                      name="dob"
+                      value={formData.dob}
+                      onChange={handleInputChange}
+                      onKeyDown={(e) => handleKeyDown(e, 'dob')}
+                      ref={inputRefs.dob}
+                      placeholder="DOB"
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 'clamp(0.9rem, 3vw, 1rem)', color: '#2c3e50', fontWeight: 500 }}>
+                      Route
+                    </label>
+                    <Select
+                      ref={inputRefs.routeId}
+                      options={routeOptions}
+                      value={routeOptions.find((opt) => opt.value === (typeof formData.routeId === 'string' ? formData.routeId : formData.routeId?._id)) || null}
+                      onChange={(newValue) => handleSelectChange('routeId', newValue, 'routeId')}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const currentValue = inputRefs.routeId.current?.props.value;
+                          if (currentValue) {
+                            handleSelectChange('routeId', currentValue, 'routeId');
+                          } else {
+                            const inputValue = (e.target as any).value || '';
+                            const filteredOptions = routeOptions.filter((opt) =>
+                              opt.label.toLowerCase().includes(inputValue.toLowerCase())
+                            );
+                            if (filteredOptions.length > 0) {
+                              handleSelectChange('routeId', filteredOptions[0], 'routeId');
+                            } else {
+                              const currentIndex = fieldOrder.indexOf('routeId');
+                              const nextField = fieldOrder[currentIndex + 1];
+                              if (nextField && inputRefs[nextField].current) {
+                                inputRefs[nextField].current?.focus();
+                                if (inputRefs[nextField].current instanceof HTMLElement) {
+                                  inputRefs[nextField].current?.select?.();
+                                } else {
+                                  (inputRefs[nextField].current as SelectInstance<Option>)?.focus();
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }}
+                      placeholder="Select Route"
+                      isClearable
+                      isSearchable
+                      filterOption={(option, inputValue) =>
+                        option.label.toLowerCase().includes(inputValue.toLowerCase())
+                      }
+                      styles={{
+                        control: (base) => ({
+                          ...base,
+                          borderRadius: '6px',
+                          padding: '0.2rem',
+                          minWidth: '100%',
+                        }),
+                        menu: (base) => ({
+                          ...base,
+                          borderRadius: '6px',
+                          marginTop: '4px',
+                          zIndex: 1000,
+                        }),
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 'clamp(0.9rem, 3vw, 1rem)', color: '#2c3e50', fontWeight: 500 }}>
+                      Pickup Point
+                    </label>
+                    <Select
+                      ref={inputRefs.pickupPointId}
+                      options={pickupPointOptions}
+                      value={pickupPointOptions.find((opt) => opt.value === (typeof formData.pickupPointId === 'string' ? formData.pickupPointId : formData.pickupPointId?._id)) || null}
+                      onChange={(newValue) => handleSelectChange('pickupPointId', newValue, 'pickupPointId')}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const currentValue = inputRefs.pickupPointId.current?.props.value;
+                          if (currentValue) {
+                            handleSelectChange('pickupPointId', currentValue, 'pickupPointId');
+                          } else {
+                            const inputValue = (e.target as any).value || '';
+                            const filteredOptions = pickupPointOptions.filter((opt) =>
+                              opt.label.toLowerCase().includes(inputValue.toLowerCase())
+                            );
+                            if (filteredOptions.length > 0) {
+                              handleSelectChange('pickupPointId', filteredOptions[0], 'pickupPointId');
+                            } else {
+                              const currentIndex = fieldOrder.indexOf('pickupPointId');
+                              const nextField = fieldOrder[currentIndex + 1];
+                              if (nextField && inputRefs[nextField].current) {
+                                inputRefs[nextField].current?.focus();
+                                if (inputRefs[nextField].current instanceof HTMLElement) {
+                                  inputRefs[nextField].current?.select?.();
+                                } else {
+                                  (inputRefs[nextField].current as SelectInstance<Option>)?.focus();
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }}
+                      placeholder="Select Pickup Point"
+                      isClearable
+                      isSearchable
+                      isDisabled={!formData.routeId}
+                      filterOption={(option, inputValue) =>
+                        option.label.toLowerCase().includes(inputValue.toLowerCase())
+                      }
+                      styles={{
+                        control: (base) => ({
+                          ...base,
+                          borderRadius: '6px',
+                          padding: '0.2rem',
+                          minWidth: '100%',
+                        }),
+                        menu: (base) => ({
+                          ...base,
+                          borderRadius: '6px',
+                          marginTop: '4px',
+                          zIndex: 1000,
+                        }),
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 'clamp(0.9rem, 3vw, 1rem)', color: '#2c3e50', fontWeight: 500 }}>
+                      Fees Month
+                    </label>
+                    <Input
+                      name="feesMonth"
+                      value={formData.feesMonth}
+                      onChange={handleInputChange}
+                      onKeyDown={(e) => handleKeyDown(e, 'feesMonth')}
+                      ref={inputRefs.feesMonth}
+                      placeholder="Fees Month"
+                    />
+                  </div>
+                </GridSection>
+
+                <SectionTitle>Fees Details</SectionTitle>
+                <FeeSection>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>Fees</span>
+                    <Button type="button" onClick={() => setFeesVisible(!feesVisible)}>
+                      {feesVisible ? <FaMinus /> : <FaPlus />}
+                    </Button>
+                  </div>
+                  {feesVisible &&
+                    formData.fees.map((fee, index) => (
+                      <FeeGrid key={index}>
+                        <div>
+                          <label style={{ fontSize: 'clamp(0.9rem, 3vw, 1rem)', color: '#2c3e50', fontWeight: 500 }}>
+                            Fee Type
+                          </label>
+                          <Input
+                            placeholder="Fee Type"
+                            value={fee.feeType}
+                            onChange={(e) => handleFeeChange(index, 'feeType', e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: 'clamp(0.9rem, 3vw, 1rem)', color: '#2c3e50', fontWeight: 500 }}>
+                            Due Date
+                          </label>
+                          <Input
+                            type="date"
+                            placeholder="Due Date"
+                            value={fee.dueDate}
+                            onChange={(e) => handleFeeChange(index, 'dueDate', e.target.value)}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', gap: '1rem' }}>
+                          <div style={{ flex: 1 }}>
+                            <label style={{ fontSize: 'clamp(0.9rem, 3vw, 1rem)', color: '#2c3e50', fontWeight: 500 }}>
+                              Amount
+                            </label>
+                            <Input
+                              type="number"
+                              placeholder="Amount"
+                              value={fee.amount}
+                              onChange={(e) => handleFeeChange(index, 'amount', e.target.value)}
+                            />
+                          </div>
+                          {index > 0 && (
+                            <Button
+                              type="button"
+                              style={{ background: '#e74c3c', marginTop: '1.5rem' }}
+                              onClick={() => removeFee(index)}
+                            >
+                              Remove
+                            </Button>
+                          )}
+                        </div>
+                      </FeeGrid>
+                    ))}
+                  {feesVisible && (
+                    <Button type="button" onClick={addFee} style={{ marginTop: '1rem' }}>
+                      Add Fee
+                    </Button>
                   )}
-                </Box>
-              </FeeGrid>
-            ))}
-            <Button onClick={addFee} sx={{ mt: 2 }} color="primary">Add Fee</Button>
-          </Collapse>
-        </FeeSection>
-      )}
+                </FeeSection>
 
-      <Typography variant="h6" sx={{ mb: 2, mt: 3 }}>
-        👨‍👩‍👧 Parent & Guardian Details
-      </Typography>
-      {['father', 'mother'].map((parent, index) => (
-        <GridSection key={parent}>
-          <Input
-            placeholder={`${parent.charAt(0).toUpperCase() + parent.slice(1)} Name`}
-            name="name"
-            value={formData.parents[parent].name}
-            onChange={(e) => handleInputChange(e, 'parents', parent)}
-            inputRef={(el) => (inputRefs.current[14 + index * 3] = el)}
-            onKeyDown={(e) => handleKeyDown(e, 14 + index * 3)}
-          />
-          <Input
-            placeholder={`${parent.charAt(0).toUpperCase() + parent.slice(1)} Phone`}
-            name="phone"
-            value={formData.parents[parent].phone}
-            onChange={(e) => handleInputChange(e, 'parents', parent)}
-            inputRef={(el) => (inputRefs.current[15 + index * 3] = el)}
-            onKeyDown={(e) => handleKeyDown(e, 15 + index * 3)}
-          />
-          <Input
-            placeholder={`${parent.charAt(0).toUpperCase() + parent.slice(1)} Occupation`}
-            name="occupation"
-            value={formData.parents[parent].occupation}
-            onChange={(e) => handleInputChange(e, 'parents', parent)}
-            inputRef={(el) => (inputRefs.current[16 + index * 3] = el)}
-            onKeyDown={(e) => handleKeyDown(e, 16 + index * 3)}
-          />
-        </GridSection>
-      ))}
+                <SectionTitle>Parent & Guardian Details</SectionTitle>
+                {(['father', 'mother'] as const).map((parent) => (
+                  <GridSection key={parent}>
+                    <div>
+                      <label style={{ fontSize: 'clamp(0.9rem, 3vw, 1rem)', color: '#2c3e50', fontWeight: 500 }}>
+                        {parent.charAt(0).toUpperCase() + parent.slice(1)} Name
+                      </label>
+                      <Input
+                        placeholder={`${parent.charAt(0).toUpperCase() + parent.slice(1)} Name`}
+                        name="name"
+                        value={formData.parents[parent].name}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange(e, 'parents', parent)}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 'clamp(0.9rem, 3vw, 1rem)', color: '#2c3e50', fontWeight: 500 }}>
+                        {parent.charAt(0).toUpperCase() + parent.slice(1)} Phone
+                      </label>
+                      <Input
+                        placeholder={`${parent.charAt(0).toUpperCase() + parent.slice(1)} Phone`}
+                        name="phone"
+                        value={formData.parents[parent].phone}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange(e, 'parents', parent)}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 'clamp(0.9rem, 3vw, 1rem)', color: '#2c3e50', fontWeight: 500 }}>
+                        {parent.charAt(0).toUpperCase() + parent.slice(1)} Occupation
+                      </label>
+                      <Input
+                        placeholder={`${parent.charAt(0).toUpperCase() + parent.slice(1)} Occupation`}
+                        name="occupation"
+                        value={formData.parents[parent].occupation}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange(e, 'parents', parent)}
+                      />
+                    </div>
+                  </GridSection>
+                ))}
 
-      <Typography variant="h6" sx={{ mb: 2, mt: 3 }}>
-        📋 Additional Details
-      </Typography>
-      <GridSection>
-        <Input
-          placeholder="Aadhar Number"
-          name="aadharNumber"
-          value={formData.additionalDetails.aadharNumber}
-          onChange={(e) => handleInputChange(e, 'additionalDetails')}
-          inputRef={(el) => (inputRefs.current[20] = el)}
-          onKeyDown={(e) => handleKeyDown(e, 20)}
-        />
-        <Input
-          placeholder="PAN Number"
-          name="panNumber"
-          value={formData.additionalDetails.panNumber}
-          onChange={(e) => handleInputChange(e, 'additionalDetails')}
-          inputRef={(el) => (inputRefs.current[21] = el)}
-          onKeyDown={(e) => handleKeyDown(e, 21)}
-        />
-        <Input
-          placeholder="TC Number"
-          name="tcNumber"
-          value={formData.additionalDetails.tcNumber}
-          onChange={(e) => handleInputChange(e, 'additionalDetails')}
-          inputRef={(el) => (inputRefs.current[22] = el)}
-          onKeyDown={(e) => handleKeyDown(e, 22)}
-        />
-      </GridSection>
+                <SectionTitle>Additional Details</SectionTitle>
+                <GridSection>
+                  <div>
+                    <label style={{ fontSize: 'clamp(0.9rem, 3vw, 1rem)', color: '#2c3e50', fontWeight: 500 }}>
+                      Aadhar Number
+                    </label>
+                    <Input
+                      placeholder="Aadhar Number"
+                      name="aadharNumber"
+                      value={formData.additionalDetails.aadharNumber}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange(e, 'additionalDetails')}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 'clamp(0.9rem, 3vw, 1rem)', color: '#2c3e50', fontWeight: 500 }}>
+                      PAN Number
+                    </label>
+                    <Input
+                      placeholder="PAN Number"
+                      name="panNumber"
+                      value={formData.additionalDetails.panNumber}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange(e, 'additionalDetails')}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 'clamp(0.9rem, 3vw, 1rem)', color: '#2c3e50', fontWeight: 500 }}>
+                      TC Number
+                    </label>
+                    <Input
+                      placeholder="TC Number"
+                      name="tcNumber"
+                      value={formData.additionalDetails.tcNumber}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange(e, 'additionalDetails')}
+                    />
+                  </div>
+                </GridSection>
 
-      <SaveButton onClick={handleSubmit}>💾 Save</SaveButton>
-
-      <Snackbar
-        open={snack.open}
-        autoHideDuration={3000}
-        onClose={() => setSnack({ ...snack, open: false })}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-      >
-        <Alert onClose={() => setSnack({ ...snack, open: false })} severity={snack.severity} sx={{ width: '100%' }}>
-          {snack.message}
-        </Alert>
-      </Snackbar>
-    </FormContainer>
+                <div style={{ display: 'flex', gap: '0.8rem', justifyContent: 'center', marginTop: '1rem' }}>
+                  <Button type="submit">Save</Button>
+                  <Button
+                    type="button"
+                    style={{ background: 'linear-gradient(45deg, #e74c3c, #c0392b)' }}
+                    onClick={() => setShowForm(false)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </FormContainer>
+            </Modal>
+          </>
+        )}
+      </Container>
+    </>
   );
 };
 

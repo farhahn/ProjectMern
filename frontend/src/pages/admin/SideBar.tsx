@@ -202,16 +202,16 @@ const SideBar = () => {
             </ListItemButton>
             <Collapse in={open.students} timeout="auto" unmountOnExit>
                 <List component="div" disablePadding>
-                    <ListItemButton component={Link} to="/Admin/students/branches" sx={{ pl: 4 }}>
+                    {/* <ListItemButton component={Link} to="/Admin/students/branches" sx={{ pl: 4 }}>
                         <ListItemText primary="Branches" />
-                    </ListItemButton>
-                    <ListItemButton component={Link} to="/Admin/studentall/studentdetail" sx={{ pl: 4 }}>
+                    </ListItemButton> */}
+                    {/* <ListItemButton component={Link} to="/Admin/studentall/studentdetail" sx={{ pl: 4 }}>
                         <ListItemText primary="Student Details" />
-                    </ListItemButton>
+                    </ListItemButton> */}
                     <ListItemButton component={Link} to="/Admin/studentall/studentadmissionform" sx={{ pl: 4 }}>
                         <ListItemText primary=" Admission" />
                     </ListItemButton>
-                    <ListItemButton component={Link} to="/Admin/studentall/studentdetail" sx={{ pl: 4 }}>
+                    <ListItemButton component={Link} to="/Admin/studentall/disablestudents" sx={{ pl: 4 }}>
                         <ListItemText primary="Disabled Students" />
                     </ListItemButton>
                     <ListItemButton component={Link} to="/Admin/studentall/studentsearch" sx={{ pl: 4 }}>

@@ -24,7 +24,16 @@ import assignmentReducer from './TransportRelated/AssignmentSlice.js';
 import pickupPointReducer from './TransportRelated/PickupPointSlice.js';
 import routePickupPointReducer from './TransportRelated/route-pickup-pointSlice.js';
 import studentsReducer from './StudentAddmissionDetail/studentAddmissionSlice.js';
-import searchStudentReducer from './StudentAddmissionDetail/searchStudentSlice.js';
+import admissionFormReducer from './StudentAddmissionDetail/studentAddmissionSlice';
+import studentSearchReducer from './StudentAddmissionDetail/studentSearchSlice.js';
+import bulkDeleteReducer from './StudentAddmissionDetail/bulkDeleteSlice.js';
+import categoryReducer from './StudentAddmissionDetail/categorySlice.js';
+import houseReducer from './StudentAddmissionDetail/houseSlice.js';
+import reasonReducer from './StudentAddmissionDetail/reasonSlice.js';
+import disabledStudentReducer from './StudentAddmissionDetail/disabledStudentSlice.js';
+
+
+
 
 // import { librariansReducer } from './librarianrelated/librarianSlice';
 
@@ -55,7 +64,13 @@ const store = configureStore({
            pickupPoint: pickupPointReducer,
            routePickupPoint: routePickupPointReducer,
             students: studentsReducer,
-             searchStudent: searchStudentReducer,
+             admissionForms: admissionFormReducer,
+             studentSearch: studentSearchReducer,
+             bulkDelete: bulkDeleteReducer,
+             category: categoryReducer,
+             house: houseReducer,
+             reason: reasonReducer,
+             disabledStudent: disabledStudentReducer,
         // librarians: librariansReducer, // ✅ Key should match useSelector()
     },
 });

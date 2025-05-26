@@ -1,15 +1,19 @@
 import axios from 'axios';
+import {
+  getRequest,
+  getSuccess,
+  getError,
+  stuffDone,
+} from './studentAddmissionSlice.js';
 
-const baseURL = process.env.REACT_APP_BASE_URL || 'http://localhost:5000';
-
-const axiosInstance = axios.create({
-  baseURL,
+const api = axios.create({
+  baseURL: process.env.REACT_APP_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-axiosInstance.interceptors.request.use((config) => {
+api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -17,42 +21,59 @@ axiosInstance.interceptors.request.use((config) => {
   return config;
 });
 
-export const createStudent = (studentData, adminID) => async (dispatch) => {
+export const fetchAdmissionForms = (adminID) => async (dispatch) => {
+  dispatch(getRequest());
+  console.log(`Request URL: /admissionForms/${adminID} with adminID: ${adminID}`);
   try {
-    dispatch({ type: 'STUDENT_REQUEST' });
-    const response = await axiosInstance.post('/student', { ...studentData, adminID });
-    dispatch({
-      type: 'CREATE_STUDENT_SUCCESS',
-      payload: response.data.data,
-    });
-    return Promise.resolve();
+    const response = await api.get(`/admissionForms/${adminID}`);
+    console.log('Fetch admission forms response:', response.data);
+    dispatch(getSuccess(response.data.data || []));
+    dispatch(stuffDone());
   } catch (error) {
-    const errorMessage = error.response?.data?.message || 'Failed to add student';
-    dispatch({
-      type: 'STUDENT_FAIL',
-      payload: errorMessage,
-    });
-    return Promise.reject(errorMessage);
+    const errorMessage = error.response?.data?.message || error.message;
+    console.error('Error fetching admission forms:', errorMessage, error);
+    dispatch(getError(errorMessage));
+    dispatch(stuffDone());
   }
 };
 
-export const getStudentById = (id, adminID) => async (dispatch) => {
+export const addAdmissionForm = (data, adminID) => async (dispatch) => {
+  dispatch(getRequest());
   try {
-    dispatch({ type: 'STUDENT_REQUEST' });
-    const response = await axiosInstance.get(`/student/${id}?adminID=${adminID}`);
-    dispatch({
-      type: 'GET_STUDENT_SUCCESS',
-      payload: response.data.data,
-    });
+    const payload = { ...data, adminID };
+    await api.post('/admissionForm', payload);
+    dispatch(stuffDone());
+    dispatch(fetchAdmissionForms(adminID));
   } catch (error) {
-    const errorMessage = error.response?.data?.message || 'Failed to fetch student';
-    dispatch({
-      type: 'STUDENT_FAIL',
-      payload: errorMessage,
-    });
+    const errorMessage = error.response?.data?.message || error.message;
+    console.error('Error adding admission form:', errorMessage, error.stack);
+    dispatch(getError(errorMessage));
   }
 };
 
-export const clearStudentError = () => ({
-  type: 'CLEAR_STUDENT_ERROR',
-});
+export const updateAdmissionForm = (id, formData, adminID) => async (dispatch) => {
+  dispatch(getRequest());
+  try {
+    const payload = { ...formData, adminID };
+    await api.put(`/admissionForm/${id}`, payload);
+    dispatch(stuffDone());
+    dispatch(fetchAdmissionForms(adminID));
+  } catch (error) {
+    const errorMessage = error.response?.data?.message || error.message;
+    console.error('Error updating admission form:', errorMessage, error.stack);
+    dispatch(getError(errorMessage));
+  }
+};
+
+export const deleteAdmissionForm = (id, adminID) => async (dispatch) => {
+  dispatch(getRequest());
+  try {
+    await api.delete(`/admissionForm/${id}?adminID=${adminID}`);
+    dispatch(stuffDone());
+    dispatch(fetchAdmissionForms(adminID));
+  } catch (error) {
+    const errorMessage = error.response?.data?.message || error.message;
+    console.error('Error deleting admission form:', errorMessage, error.stack);
+    dispatch(getError(errorMessage));
+  }
+};

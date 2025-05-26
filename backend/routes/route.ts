@@ -238,19 +238,83 @@ router.put('/route-pickup-point/:id', routePickupPointController.updateRoutePick
 router.delete('/route-pickup-point/:id', routePickupPointController.deleteRoutePickupPoint);
 
 
+const {
+  getAdmissionForms,
+  addAdmissionForm,
+  updateAdmissionForm,
+  deleteAdmissionForm,
+} = require('../controllers/student-addmission-controller');
 
-const studentController = require('../controllers/student-addmission-controller');
+router.get('/admissionForms/:adminID', getAdmissionForms);
+router.post('/admissionForm', addAdmissionForm);
+router.put('/admissionForm/:id', updateAdmissionForm);
+router.delete('/admissionForm/:id', deleteAdmissionForm);
 
-router.get('/students/:adminID', studentController.getStudents);
-router.get('/student/:id', studentController.getStudentById);
-router.post('/student', studentController.addStudent);
-router.put('/student/:id', studentController.updateStudent);
-router.delete('/student/:id', studentController.deleteStudent);
+// const searchStudentController = require('../controllers/search-student-controller');
 
-const searchStudentController = require('../controllers/search-student-controller');
+// router.get('/search-class/:adminID', searchStudentController.getClasses);
+// router.get('/search-student', searchStudentController.searchStudents);
 
-router.get('/search-class/:adminID', searchStudentController.getClasses);
-router.get('/search-student', searchStudentController.searchStudents);
+
+const { searchStudents } = require('../controllers/student-search-controller');
+
+router.get('/searchStudents/:adminID', searchStudents);
+
+
+const { getAllStudents, bulkDeleteStudents } = require('../controllers/bulk-delete-controller');
+
+router.get('/bulkDeleteStudents/:adminID', getAllStudents);
+router.delete('/bulkDeleteStudents/:adminID', bulkDeleteStudents);
+
+
+const { getAllCategories, createCategory, deleteCategory } = require('../controllers/categoryController');
+
+router.get('/categories/:adminID', getAllCategories);
+router.post('/categories/:adminID', createCategory);
+router.delete('/categories/:adminID/:categoryId', deleteCategory);
+
+const { getAllHouses, createHouse, deleteHouse } = require('../controllers/houseController');
+
+router.get('/houses/:adminID', getAllHouses);
+router.post('/houses/:adminID', createHouse);
+router.delete('/houses/:adminID/:houseId', deleteHouse);
+
+const { getAllReasons, createReason, updateReason, deleteReason } = require('../controllers/reasonController');
+
+router.get('/reasons/:adminID', getAllReasons);
+router.post('/reasons/:adminID', createReason);
+router.put('/reasons/:adminID/:reasonId', updateReason);
+router.delete('/reasons/:adminID/:reasonId', deleteReason);
+
+const {
+  getAllDisabledStudents,
+  createDisabledStudent,
+  updateDisabledStudent,
+  deleteDisabledStudent,
+} = require('../controllers/disabledStudentController');
+
+router.get('/disabled-students/:adminID', getAllDisabledStudents);
+router.post('/disabled-students/:adminID', createDisabledStudent);
+router.put('/disabled-students/:adminID/:disabledStudentId', updateDisabledStudent);
+router.delete('/disabled-students/:adminID/:disabledStudentId', deleteDisabledStudent);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
